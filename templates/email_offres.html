@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CI Offres - Nouvelles Opportunités</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4; line-height: 1.6; }
+        .container { max-width: 600px; margin: 0 auto; background: white; }
+        .header { background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); color: white; padding: 30px; text-align: center; }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .header p { font-size: 16px; opacity: 0.9; }
+        .content { padding: 30px; }
+        .intro { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 25px; text-align: center; }
+        .intro h2 { color: #007bff; margin-bottom: 10px; }
+        .offre { border: 1px solid #e0e0e0; margin: 15px 0; padding: 20px; border-radius: 8px; background: #fafafa; transition: transform 0.2s; }
+        .offre:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .offre-title { color: #007bff; font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+        .offre-title a { color: #007bff; text-decoration: none; }
+        .offre-title a:hover { text-decoration: underline; }
+        .offre-meta { color: #666; font-size: 14px; margin: 8px 0; }
+        .offre-meta span { margin-right: 15px; }
+        .btn { display: inline-block; background: #007bff; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; margin-top: 15px; font-weight: bold; }
+        .btn:hover { background: #0056b3; }
+        .footer { background: #f8f9fa; text-align: center; padding: 25px; color: #666; font-size: 13px; border-top: 1px solid #e0e0e0; }
+        .footer a { color: #007bff; text-decoration: none; }
+        .flag { font-size: 24px; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+        .badge-emploi { background: #28a745; color: white; }
+        .badge-appel { background: #ffc107; color: #333; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <span class="flag">🇨🇮</span>
+            <h1>CI Offres</h1>
+            <p>Vos opportunités professionnelles en Côte d'Ivoire</p>
+        </div>
+        
+        <div class="content">
+            <div class="intro">
+                <h2>{{ count }} Nouvelle(s) Opportunité(s)</h2>
+                <p>Du {{ date }}</p>
+            </div>
+            
+            {% for offre in offres %}
+            <div class="offre">
+                <div class="offre-title">
+                    <a href="{{ offre.url }}" target="_blank">{{ offre.title }}</a>
+                </div>
+                <div class="offre-meta">
+                    {% if offre.employment_type == 'Appel d\'offre' %}
+                    <span class="badge badge-appel">📋 Appel d'offre</span>
+                    {% else %}
+                    <span class="badge badge-emploi">💼 Emploi</span>
+                    {% endif %}
+                    <span>🏢 {{ offre.source }}</span>
+                    <span>📍 {{ offre.location or 'Non spécifié' }}</span>
+                </div>
+                <div class="offre-meta">
+                    <span>📅 {{ offre.date_publication.strftime('%d/%m/%Y') if offre.date_publication else 'Date inconnue' }}</span>
+                    {% if offre.company_name %}
+                    <span>🏭 {{ offre.company_name }}</span>
+                    {% endif %}
+                </div>
+                <a href="{{ offre.url }}" class="btn" target="_blank">Voir l'offre →</a>
+            </div>
+            {% endfor %}
+            
+            <div style="text-align: center; margin-top: 30px;">
+                <a href="http://localhost:5000/api/offres" class="btn" style="background: #28a745;">Voir toutes les offres</a>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Vous recevez cet email car vous êtes abonné à <strong>CI Offres</strong></p>
+            <p style="margin-top: 10px;">
+                <a href="http://localhost:5000/api/unsubscribe/{{ email }}">Se désabonner</a> | 
+                <a href="http://localhost:5000">Consulter le site</a>
+            </p>
+            <p style="margin-top: 15px; color: #999;">CI Offres © 2024 - Tous droits réservés</p>
+        </div>
+    </div>
+</body>
+</html>
