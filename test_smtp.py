@@ -12,7 +12,7 @@ def test_smtp_connection():
         msg = MIMEText("✅ Connexion SMTP réussie!")
         msg['Subject'] = "Test SMTP"
         msg['From'] = Config.MAIL_USERNAME
-        msg['To'] = "pascal.ndri@infosoluces.ci"
+        msg['To'] = Config.MAIL_USERNAME
         # msg['To'] = Config.MAIL_USERNAME
         
         server.send_message(msg)
