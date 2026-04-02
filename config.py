@@ -40,3 +40,8 @@ class Config:
     # Pagination
     DEFAULT_PAGE_SIZE = 200
     MAX_PAGE_SIZE = 100
+        # LinkedIn
+    LINKEDIN_MAX_RESULTS = int(os.getenv('LINKEDIN_MAX_RESULTS', '20'))
+    LINKEDIN_DELAY_MIN = float(os.getenv('LINKEDIN_DELAY_MIN', '8'))
+    LINKEDIN_DELAY_MAX = float(os.getenv('LINKEDIN_DELAY_MAX', '15'))
+    LINKEDIN_MAX_SCROLLS = int(os.getenv('LINKEDIN_MAX_SCROLLS', '5'))

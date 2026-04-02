@@ -14,7 +14,7 @@ from scrapers.manager import run_all_scrapers
 from scripts.create_admin import create_default_admin
 from services.email_service import email_service
 from models.subscription import EmailSubscription
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import os
 
@@ -94,7 +94,12 @@ def create_app():
     
     def scraping_job():
         """Tâche de scraping automatique"""
+        """Tâche de scraping automatique"""
+        if not current_app.config.get('SCRAPING_ENABLED', True):
+            logger.info("⏭️  Scraping désactivé - skip")
+            return
         logger.info("🔄 [SCHEDULER] Démarrage du scraping automatique...")
+        # logger.info("🔄 [SCHEDULER] Démarrage du scraping automatique...")
         try:
             result = run_all_scrapers()
             logger.info(f"✅ [SCHEDULER] Scraping terminé: {result.get('total_offres', 0)} offres")
@@ -103,6 +108,10 @@ def create_app():
     
     def email_job():
         """Tâche d'envoi d'emails automatique"""
+        if not current_app.config.get('EMAIL_SENDING_ENABLED', True):
+            logger.info("⏭️  Envoi emails désactivé - skip")
+            return
+        
         logger.info("📧 [SCHEDULER] Envoi des emails automatiques...")
         try:
             count = email_service.send_daily_digest()
@@ -137,11 +146,24 @@ def create_app():
         replace_existing=True
     )
     logger.info("✅ Scheduler emails configuré (tous les jours à 11h)")
+
+    # Planifier emails (fréquence configurable via EMAIL_SCHEDULE_MINUTES)
+    scheduler.add_job(
+        email_job,
+        'interval',
+        minutes=app.config['EMAIL_SCHEDULE_MINUTES'],
+        id='email_job',
+        replace_existing=True,
+        # Ne pas lancer au démarrage, attendre le premier intervalle
+        next_run_time=datetime.utcnow() + timedelta(minutes=app.config['EMAIL_SCHEDULE_MINUTES'])
+    )
     
     scheduler.start()
+    logger.info(f"✅ Scheduler démarré - Emails: {app.config['EMAIL_SCHEDULE_MINUTES']}min")
     
     # Shutdown handler
     import atexit
+    
     atexit.register(lambda: scheduler.shutdown())
     
     logger.info("🚀 Application prête à démarrer!")
