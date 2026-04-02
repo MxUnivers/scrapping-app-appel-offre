@@ -11,6 +11,7 @@ from mongoengine import connect
 from config import Config
 from apscheduler.schedulers.background import BackgroundScheduler
 from scrapers.manager import run_all_scrapers
+from scripts.create_admin import create_default_admin
 from services.email_service import email_service
 from models.subscription import EmailSubscription
 from datetime import datetime
@@ -45,6 +46,7 @@ def create_app():
     try:
         connect(**app.config['MONGODB_SETTINGS'])
         logger.info("✅ Connecté à MongoDB")
+        create_default_admin()
     except Exception as e:
         logger.error(f"❌ Erreur connexion MongoDB: {e}")
         raise
@@ -126,6 +128,15 @@ def create_app():
         replace_existing=True
     )
     logger.info("✅ Scheduler emails configuré (tous les jours à 8h)")
+    
+    scheduler.add_job(
+        email_job,
+        'cron',
+        hour=11,  # Tous les jours à 11h
+        id='email_job',
+        replace_existing=True
+    )
+    logger.info("✅ Scheduler emails configuré (tous les jours à 11h)")
     
     scheduler.start()
     
