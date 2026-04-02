@@ -162,3 +162,150 @@ def get_all_offres():
     except Exception as e:
         logger.error(f"Erreur get_all_offres: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@admin_bp.route('/emails/status', methods=['GET'])
+@require_admin
+def email_status():
+    """Voir le statut de la configuration email"""
+    try:
+        status = email_service.get_email_status()
+        return jsonify({
+            'status': 'success',
+            'data': status
+        })
+    except Exception as e:
+        logger.error(f"Erreur email_status: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@admin_bp.route('/emails/send-test', methods=['POST'])
+@require_admin
+def send_test_email():
+    """
+    Envoyer un email de test IMMÉDIATEMENT
+    Payload JSON optionnel:
+    {
+        "recipient": "autre@email.com",  # Optionnel
+        "subject": "Mon sujet perso",     # Optionnel
+        "content": "<p>Mon contenu HTML</p>"  # Optionnel
+    }
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        
+        result = email_service.send_test_email(
+            recipient=data.get('recipient'),
+            subject=data.get('subject'),
+            content=data.get('content')
+        )
+        
+        if result['success']:
+            return jsonify({
+                'status': 'success',
+                'message': 'Email de test envoyé!',
+                'data': result
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': f"Échec: {result.get('error')}",
+                'data': result
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Erreur send_test_email: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@admin_bp.route('/emails/send-digest-test', methods=['POST'])
+@require_admin
+def send_digest_test():
+    """Envoyer le digest d'offres uniquement à l'admin (pour test)"""
+    try:
+        result = email_service.send_digest_to_admin_only()
+        
+        if result['success']:
+            return jsonify({
+                'status': 'success',
+                'message': f"Digest test envoyé ({result.get('sent', 0)} offres)",
+                'data': result
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': f"Échec: {result.get('error')}",
+                'data': result
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Erreur send_digest_test: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@admin_bp.route('/emails/toggle', methods=['POST'])
+@require_admin
+def toggle_email_sending():
+    """
+    Activer/Désactiver l'envoi automatique d'emails
+    Payload: {"enabled": true/false}
+    
+    ⚠️  Note: Ce changement est temporaire (en mémoire).
+    Pour un changement permanent, modifier .env et redémarrer.
+    """
+    try:
+        data = request.get_json()
+        new_state = data.get('enabled')
+        
+        if new_state is None:
+            return jsonify({'status': 'error', 'message': 'Champ "enabled" requis'}), 400
+        
+        # Mise à jour temporaire (en mémoire seulement)
+        current_app.config['EMAIL_SENDING_ENABLED'] = new_state
+        
+        logger.info(f"🔘 Email sending {'activé' if new_state else 'désactivé'} (session)")
+        
+        return jsonify({
+            'status': 'success',
+            'message': f"Envoi d'emails {'activé' if new_state else 'désactivé'}",
+            'data': {
+                'enabled': new_state,
+                'note': 'Changement temporaire - redémarrez pour appliquer .env'
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Erreur toggle_email: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@admin_bp.route('/emails/update-schedule', methods=['POST'])
+@require_admin
+def update_email_schedule():
+    """
+    Modifier la fréquence d'envoi (temporaire)
+    Payload: {"minutes": 5}
+    """
+    try:
+        data = request.get_json()
+        minutes = data.get('minutes')
+        
+        if not minutes or not isinstance(minutes, int) or minutes < 1:
+            return jsonify({'status': 'error', 'message': 'Minutes valides requises (>=1)'}), 400
+        
+        # Mise à jour temporaire
+        current_app.config['EMAIL_SCHEDULE_MINUTES'] = minutes
+        
+        # 🔁 Re-scheduler la tâche (si le scheduler est accessible)
+        # Note: Pour une mise à jour dynamique du scheduler, 
+        # il faudrait exposer le scheduler en variable globale ou via un service
+        
+        logger.info(f"🔄 Email schedule mis à jour: toutes les {minutes} minutes (session)")
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Fréquence mise à jour: {minutes} minutes',
+            'data': {
+                'minutes': minutes,
+                'note': 'Changement temporaire - redémarrez pour appliquer .env'
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Erreur update_schedule: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500

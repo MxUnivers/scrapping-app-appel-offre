@@ -48,6 +48,7 @@ __all__ = [
     'EmploiCiScraper',
     'ArmpScraper',
     
+    
     # Scrapers appels d'offres - Sites CI
     'J360InfoScraper',              # j360.info
     'MarchesPublicsCiScraper',      # marchespublics.ci
@@ -62,6 +63,7 @@ __all__ = [
     'OnadCiScraper',                # onad.ci
     'CorisBankCiScraper',           # cotedivoire.coris.bank
     'FacebookCimarchesScraper',     # facebook.com/cimarches (⚠️ limité)
+     'LinkedInCiScraper',  # ← NOUVEAU
     
     # Manager & fonctions utilitaires
     'ScraperManager',

@@ -1,6 +1,8 @@
 import logging
 from datetime import datetime
 
+from scrapers.linkedine_ci import LinkedInCiScraper
+
 logger = logging.getLogger(__name__)
 
 # Import TOUS les scrapers
@@ -23,7 +25,7 @@ from .facebook_cimarches import FacebookCimarchesScraper
 
 class ScraperManager:
     """Gère l'exécution de TOUS les scrapers CI"""
-        
+
     def __init__(self):
         self.scrapers = [
             # Scrapers de base
@@ -44,6 +46,7 @@ class ScraperManager:
             OnadCiScraper(),
             CorisBankCiScraper(),
             FacebookCimarchesScraper(),  # ⚠️ Limité
+            LinkedInCiScraper(),  # ← NOUVEAU
         ]
         
         logger.info(f"✅ ScraperManager initialisé avec {len(self.scrapers)} sources")
