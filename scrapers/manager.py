@@ -23,7 +23,7 @@ from .facebook_cimarches import FacebookCimarchesScraper
 
 class ScraperManager:
     """Gère l'exécution de TOUS les scrapers CI"""
-    
+        
     def __init__(self):
         self.scrapers = [
             # Scrapers de base
