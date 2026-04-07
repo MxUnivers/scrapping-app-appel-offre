@@ -94,8 +94,7 @@ def create_app():
     
     def scraping_job():
         """Tâche de scraping automatique"""
-        """Tâche de scraping automatique"""
-        if not current_app.config.get('SCRAPING_ENABLED', True):
+        if not app.config.get('SCRAPING_ENABLED', True):
             logger.info("⏭️  Scraping désactivé - skip")
             return
         logger.info("🔄 [SCHEDULER] Démarrage du scraping automatique...")
@@ -148,18 +147,18 @@ def create_app():
     logger.info("✅ Scheduler emails configuré (tous les jours à 11h)")
 
     # Planifier emails (fréquence configurable via EMAIL_SCHEDULE_MINUTES)
-    scheduler.add_job(
-        email_job,
-        'interval',
-        minutes=app.config['EMAIL_SCHEDULE_MINUTES'],
-        id='email_job',
-        replace_existing=True,
-        # Ne pas lancer au démarrage, attendre le premier intervalle
-        next_run_time=datetime.utcnow() + timedelta(minutes=app.config['EMAIL_SCHEDULE_MINUTES'])
-    )
+    # scheduler.add_job(
+    #     email_job,
+    #     'interval',
+    #     minutes=app.config['EMAIL_SCHEDULE_MINUTES'],
+    #     id='email_job',
+    #     replace_existing=True,
+    #     # Ne pas lancer au démarrage, attendre le premier intervalle
+    #     next_run_time=datetime.utcnow() + timedelta(minutes=app.config['EMAIL_SCHEDULE_MINUTES'])
+    # )
     
     scheduler.start()
-    logger.info(f"✅ Scheduler démarré - Emails: {app.config['EMAIL_SCHEDULE_MINUTES']}min")
+    # logger.info(f"✅ Scheduler démarré - Emails: {app.config['EMAIL_SCHEDULE_MINUTES']}min")
     
     # Shutdown handler
     import atexit
