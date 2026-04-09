@@ -45,3 +45,26 @@ class Config:
     LINKEDIN_DELAY_MIN = float(os.getenv('LINKEDIN_DELAY_MIN', '8'))
     LINKEDIN_DELAY_MAX = float(os.getenv('LINKEDIN_DELAY_MAX', '15'))
     LINKEDIN_MAX_SCROLLS = int(os.getenv('LINKEDIN_MAX_SCROLLS', '5'))
+
+
+    
+       # ============================================
+    # 🔍 WEB SEARCH CONFIGURATION
+    # ============================================
+    
+    # Activer/désactiver le web search
+    WEB_SEARCH_ENABLED = os.getenv('WEB_SEARCH_ENABLED', 'false').lower() == 'true'
+    
+    # API Serper.dev (optionnel, plus fiable que DuckDuckGo)
+    SERPER_API_KEY = os.getenv('SERPER_API_KEY', '')
+    
+    # Paramètres de recherche
+    WEB_SEARCH_MAX_RESULTS = int(os.getenv('WEB_SEARCH_MAX_RESULTS', '20'))
+    WEB_SEARCH_MAX_PAGES = int(os.getenv('WEB_SEARCH_MAX_PAGES', '100'))
+    WEB_SEARCH_DOWNLOAD_DOCS = os.getenv('WEB_SEARCH_DOWNLOAD_DOCS', 'true').lower() == 'true'
+    
+    # Dossier de téléchargement
+    WEB_SEARCH_DOWNLOAD_FOLDER = os.getenv('WEB_SEARCH_DOWNLOAD_FOLDER', 'downloads/web_search')
+    
+    # Mots-clés personnalisés (override ceux du scraper)
+    WEB_SEARCH_KEYWORDS = os.getenv('WEB_SEARCH_KEYWORDS', '').split('|') if os.getenv('WEB_SEARCH_KEYWORDS') else None

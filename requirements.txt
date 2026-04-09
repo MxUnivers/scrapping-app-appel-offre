@@ -9,15 +9,13 @@ Flask-JWT-Extended==4.5.3
 pymongo==4.5.0
 mongoengine==0.27.0
 
-# Scraping
+# Scraping de base
 requests==2.31.0
 beautifulsoup4==4.12.2
-# lxml==4.9.3
 
 # Scheduler
 APScheduler==3.10.4
 
-scrapers==1.35
 # Sécurité
 python-dotenv==1.0.0
 bcrypt==4.0.1
@@ -26,3 +24,11 @@ PyJWT==2.8.0
 # Utilitaires
 python-dateutil==2.8.2
 playwright==1.40.0
+
+# Recherche web (sans pandas)
+duckduckgo-search==4.1.1
+PyPDF2==3.0.1
+openpyxl==3.1.2
+python-magic-bin==0.4.14; sys_platform == 'win32'
+urllib3==2.1.0
+tldextract==3.4.4

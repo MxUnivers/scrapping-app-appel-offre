@@ -21,6 +21,7 @@ from .batirici_ci import BatiriciCiScraper
 from .onad_ci import OnadCiScraper
 from .coris_bank_ci import CorisBankCiScraper
 from .facebook_cimarches import FacebookCimarchesScraper
+from .web_search import WebSearchScraper
 
 
 class ScraperManager:
@@ -29,6 +30,8 @@ class ScraperManager:
     def __init__(self):
         self.scrapers = [
             # Scrapers de base
+            WebSearchScraper(),  # OU WebSearchSerperScraper()
+
             EmploiCiScraper(),
             ArmpScraper(),
             
