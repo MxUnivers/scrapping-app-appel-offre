@@ -46,7 +46,6 @@ class Config:
     LINKEDIN_DELAY_MAX = float(os.getenv('LINKEDIN_DELAY_MAX', '15'))
     LINKEDIN_MAX_SCROLLS = int(os.getenv('LINKEDIN_MAX_SCROLLS', '5'))
 
-
     
        # ============================================
     # 🔍 WEB SEARCH CONFIGURATION
