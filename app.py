@@ -107,7 +107,7 @@ def create_app():
     
     def email_job():
         """Tâche d'envoi d'emails automatique"""
-        if not current_app.config.get('EMAIL_SENDING_ENABLED', True):
+        if not app.config.get('EMAIL_SENDING_ENABLED', True):
             logger.info("⏭️  Envoi emails désactivé - skip")
             return
         
