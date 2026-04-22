@@ -1,9 +1,93 @@
 services:
   - type: web
-    name: ci-offres
+    name: ci-offres-aggregator
     env: python
+    region: frankfurt          # Plus proche de l'Afrique de l'Ouest
+    plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:create_app() --bind 0.0.0.0:$PORT
+    startCommand: gunicorn "app:create_app()" --bind 0.0.0.0:$PORT --workers 1 --timeout 120
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: SECRET_KEY
+        sync: false            # À remplir manuellement sur le dashboard Render
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB
+        value: ci_offres_db
+      - key: MONGODB_USER
+        sync: false
+      - key: MONGODB_PASS
+        sync: false
+      - key: MAIL_SERVER
+        value: smtp.gmail.com
+      - key: MAIL_PORT
+        value: 587
+      - key: MAIL_USE_TLS
+        value: true
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_DEFAULT_SENDER
+        sync: false
+      - key: EMAIL_SENDING_ENABLED
+        value: true
+      - key: EMAIL_TEST_MODE
+        value: false
+      - key: EMAIL_SCHEDULE_MINUTES
+        value: 1440
+      - key: EMAIL_BATCH_LIMIT
+        value: 20
+      - key: EMAIL_TEST_RECIPIENT
+        sync: false
+      - key: SCHEDULER_INTERVAL
+        value: 5
+      - key: SCRAPING_ENABLED
+        value: true
+      - key: DEFAULT_ADMIN_EMAIL
+        sync: false
+      - key: DEFAULT_ADMIN_PASSWORD
+        sync: false
+      - key: DEFAULT_ADMIN_FIRST_NAME
+        sync: false
+      - key: DEFAULT_ADMIN_LAST_NAME
+        sync: false
+      - key: ADMIN_2_EMAIL
+        sync: false
+      - key: ADMIN_2_FIRST_NAME
+        sync: false
+      - key: ADMIN_2_LAST_NAME
+        sync: false
+      - key: ADMIN_3_EMAIL
+        sync: false
+      - key: ADMIN_3_FIRST_NAME
+        sync: false
+      - key: ADMIN_3_LAST_NAME
+        sync: false
+      - key: SERPER_API_KEY
+        sync: false
+      - key: WEB_SEARCH_ENABLED
+        value: true
+      - key: WEB_SEARCH_MAX_RESULTS
+        value: 15
+      - key: WEB_SEARCH_MAX_PAGES
+        value: 50
+      - key: WEB_SEARCH_DOWNLOAD_DOCS
+        value: false            # Désactivé : filesystem éphémère sur Render
+      - key: WEB_SEARCH_DOWNLOAD_FOLDER
+        value: /tmp/web_search  # Dossier temporaire sur Render
+      - key: WEB_SEARCH_KEYWORDS
+        value: "appel d'offre Côte d'Ivoire|marché public Abidjan|Reseau Informatique|Cyber sécurité|Developpement application"
+      - key: LINKEDIN_MAX_RESULTS
+        value: 20
+      - key: LINKEDIN_DELAY_MIN
+        value: 8
+      - key: LINKEDIN_DELAY_MAX
+        value: 15
+      - key: LINKEDIN_MAX_SCROLLS
+        value: 5
+      - key: FRONTEND_URL
+        value: https://ci-offres-aggregator.onrender.com  # Ton URL Render
