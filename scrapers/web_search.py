@@ -10,7 +10,9 @@ from pathlib import Path
 from typing import List, Dict, Optional
 from urllib.parse import urlparse, urljoin
 
-# Document parsing imports
+# =============================================================================
+# DOCUMENT PARSING (Optionnel mais recommandé)
+# =============================================================================
 try:
     import PyPDF2
     from docx import Document as WordDocument
@@ -19,35 +21,34 @@ try:
     DOCUMENT_PARSING_AVAILABLE = True
 except ImportError:
     DOCUMENT_PARSING_AVAILABLE = False
-    logging.warning("⚠️  Libraries de parsing de documents non installées")
-
-# Search API imports
-try:
-    from duckduckgo_search import DDGS
-    SEARCH_API_AVAILABLE = True
-except ImportError:
-    SEARCH_API_AVAILABLE = False
-    logging.warning("⚠️  duckduckgo-search non installé - web search désactivé")
+    logging.warning("⚠️  Libraries de parsing non installées: PyPDF2, python-docx, openpyxl, pandas")
 
 logger = logging.getLogger(__name__)
 
 
 class WebSearchScraper(BaseScraper):
     """
-    Scraper de recherche web pour trouver des appels d'offre
+    Scraper de recherche web avec Google (via Serper API) pour trouver des appels d'offre
     
     Fonctionnalités :
-    - Recherche Google/DuckDuckGo avec mots-clés configurables
-    - Parcours jusqu'à N résultats de recherche
-    - Extraction de contenu et détection d'appels d'offre
-    - Téléchargement et parsing de documents (PDF, Word, Excel, CSV)
-    - Stockage dans MongoDB avec métadonnées enrichies
+    ✅ Recherche Google via Serper API (résultats de qualité supérieure)
+    ✅ Visite des pages pour extraire le contenu réel
+    ✅ Téléchargement et parsing des documents (PDF, Word, Excel, CSV)
+    ✅ Filtrage intelligent pour appels d'offre Côte d'Ivoire
+    ✅ Stockage MongoDB avec métadonnées enrichies
+    
+    ⚠️  Nécessite une clé API Serper.dev (100 requêtes gratuites/mois)
+    🔗 https://serper.dev/
     """
     
     def __init__(self):
-        super().__init__('WebSearch CI', 'https://duckduckgo.com')
+        super().__init__('WebSearch Google', 'https://google.com')
         
-        # Mots-clés de recherche pour la Côte d'Ivoire
+        # Clé API Serper (à configurer dans .env)
+        self.api_key = os.getenv('SERPER_API_KEY', '')
+        self.serper_url = 'https://google.serper.dev/search'
+        
+        # Mots-clés optimisés pour la Côte d'Ivoire
         self.keywords = [
             "appel d'offre Côte d'Ivoire",
             "marché public Abidjan",
@@ -63,29 +64,32 @@ class WebSearchScraper(BaseScraper):
             "Vente de matériel informatique Côte d'Ivoire",
             "Informatique consultation entreprise",
             "Acquisition équipement CI",
+            "DAO Côte d'Ivoire",
+            "DCE marché public",
         ]
         
         # Configuration
-        self.max_results_per_keyword = 20  # Résultats de recherche par mot-clé
-        self.max_pages_to_visit = 100      # Pages à visiter au total
-        self.download_documents = True     # Télécharger les fichiers trouvés
-        self.download_folder = Path("downloads/web_search")
+        self.max_results_per_keyword = int(os.getenv('WEB_SEARCH_MAX_RESULTS', '15'))
+        self.max_pages_to_visit = int(os.getenv('WEB_SEARCH_MAX_PAGES', '50'))
+        self.download_documents = os.getenv('WEB_SEARCH_DOWNLOAD_DOCS', 'true').lower() == 'true'
+        self.download_folder = Path(os.getenv('WEB_SEARCH_DOWNLOAD_FOLDER', 'downloads/web_search'))
         self.download_folder.mkdir(parents=True, exist_ok=True)
         
         # Délais pour éviter les blocages
-        self.delay_between_requests = random.uniform(3, 7)
-        self.delay_between_keywords = random.uniform(5, 10)
+        self.delay_between_requests = random.uniform(2, 5)
+        self.delay_between_keywords = random.uniform(3, 8)
         
         # Filtres de contenu
         self.relevant_keywords = [
             'appel d\'offre', 'appel d\'offres', 'marché public', 'consultation',
             'avis d\'appel', 'tender', 'bid', 'rfp', 'soumission',
-            'prestataire', 'fournisseur', 'contrat public', 'DAO', 'DCE'
+            'prestataire', 'fournisseur', 'contrat public', 'DAO', 'DCE',
+            'dossier de consultation', 'cahier des charges'
         ]
         
         self.exclude_keywords = [
             'emploi', 'recrutement', 'stage', 'cdd', 'cdi', 'hiring',
-            'offre d\'emploi', 'job', 'career', 'postulez'
+            'offre d\'emploi', 'job', 'career', 'postulez', 'rejoignez'
         ]
         
         # Extensions de documents à télécharger
@@ -95,33 +99,46 @@ class WebSearchScraper(BaseScraper):
         ]
     
     def scrape(self) -> List[Dict]:
-        """Scrape le web pour trouver des appels d'offre"""
-        logger.info(f"🔄 Démarrage WebSearch scraper avec {len(self.keywords)} mots-clés...")
+        """Scrape le web via Google/Serper pour trouver des appels d'offre"""
+        logger.info(f"🔄 Démarrage WebSearch Google avec {len(self.keywords)} mots-clés...")
         
-        if not SEARCH_API_AVAILABLE:
-            logger.error("❌ duckduckgo-search non disponible")
+        if not self.api_key:
+            logger.error("❌ SERPER_API_KEY non configurée dans .env")
+            logger.info("💡 Va sur https://serper.dev pour obtenir ta clé gratuite (100 req/mois)")
             return []
         
         all_offres = []
         visited_urls = set()
         pages_visited = 0
+        api_calls = 0
         
         for i, keyword in enumerate(self.keywords, 1):
             if pages_visited >= self.max_pages_to_visit:
                 logger.info(f"✅ Limite de pages atteinte ({self.max_pages_to_visit})")
                 break
+            
+            if api_calls >= 100:  # Limite gratuite Serper
+                logger.warning(f"⚠️  Limite API Serper atteinte (100 req/mois gratuites)")
+                break
                 
-            logger.info(f"[{i}/{len(self.keywords)}] Recherche: '{keyword}'")
+            logger.info(f"[{i}/{len(self.keywords)}] Recherche Google: '{keyword}'")
             
             try:
-                # Effectuer la recherche
-                search_results = self._search_web(keyword, max_results=self.max_results_per_keyword)
+                # Effectuer la recherche via Serper API (Google)
+                search_results = self._search_google(keyword, max_results=self.max_results_per_keyword)
+                api_calls += 1
+                
+                if not search_results:
+                    logger.warning(f"   ⚠️  Aucun résultat Google pour '{keyword}'")
+                    continue
+                
+                logger.debug(f"   🔍 {len(search_results)} résultats Google pour '{keyword}'")
                 
                 for result in search_results:
                     if pages_visited >= self.max_pages_to_visit:
                         break
                     
-                    url = result.get('href') or result.get('link') or result.get('url')
+                    url = result.get('link') or result.get('url')
                     if not url or url in visited_urls:
                         continue
                     
@@ -132,25 +149,25 @@ class WebSearchScraper(BaseScraper):
                     visited_urls.add(url)
                     pages_visited += 1
                     
-                    logger.info(f"   📄 [{pages_visited}/{self.max_pages_to_visit}] Visit: {url[:80]}...")
+                    logger.info(f"   📄 [{pages_visited}/{self.max_pages_to_visit}] Visit: {url[:70]}...")
                     
-                    # Analyser la page
+                    # Analyser la page (télécharger + parser)
                     page_data = self._analyze_page(url)
                     if page_data and self._is_relevant_content(page_data):
                         
-                        # Extraire les informations
+                        # Extraire les informations structurées
                         offre = self._extract_offre_data(url, page_data, keyword)
                         if offre:
                             all_offres.append(offre)
                             
-                            # Télécharger les documents associés
+                            # Télécharger les documents associés si activé
                             if self.download_documents:
                                 docs = self._download_documents(url, page_data)
                                 if docs:
                                     offre['attached_documents'] = docs
                                     logger.info(f"   📎 {len(docs)} document(s) téléchargé(s)")
                     
-                    # Delay entre les pages
+                    # Delay entre les pages pour respecter les serveurs
                     time.sleep(self.delay_between_requests)
                 
                 # Delay entre les mots-clés
@@ -160,69 +177,107 @@ class WebSearchScraper(BaseScraper):
                 logger.error(f"❌ Erreur recherche '{keyword}': {e}")
                 continue
         
-        logger.info(f"📦 WebSearch terminé: {len(all_offres)} offres trouvées ({pages_visited} pages visitées)")
+        logger.info(f"📦 WebSearch Google terminé: {len(all_offres)} offres trouvées")
+        logger.info(f"   📊 Stats: {pages_visited} pages visitées, {api_calls} appels API Serper")
         
         if all_offres:
             self.save_to_db(all_offres)
+            logger.info(f"   💾 {len(all_offres)} offres sauvegardées dans MongoDB")
         
         return all_offres
     
-    def _search_web(self, keyword: str, max_results: int = 20) -> List[Dict]:
-        """Effectue une recherche web via DuckDuckGo"""
-        results = []
+    def _search_google(self, query: str, max_results: int = 15) -> List[Dict]:
+        """Effectue une recherche Google via l'API Serper.dev"""
+        headers = {
+            'X-API-KEY': self.api_key,
+            'Content-Type': 'application/json',
+            # 'User-Agent': self._get_random_user_agent()
+        }
+        
+        payload = {
+            'q': query,
+            'num': max_results,
+            'gl': 'ci',      # Géolocalisation: Côte d'Ivoire
+            'hl': 'fr',      # Langue: Français
+            'tbs': 'qdr:y'   # Résultats de l'année dernière
+        }
         
         try:
-            with DDGS() as ddgs:
-                # DuckDuckGo search
-                ddg_results = ddgs.text(
-                    keyword,
-                    region='fr-fr',
-                    safesearch='moderate',
-                    timelimit='y',  # Résultats de l'année dernière
-                    max_results=max_results
-                )
-                
-                for r in ddg_results:
-                    results.append({
-                        'title': r.get('title', ''),
-                        'href': r.get('href', ''),
-                        'body': r.get('body', ''),
-                        'source': r.get('source', '')
-                    })
-                    
-        except Exception as e:
-            logger.warning(f"⚠️  Erreur recherche DuckDuckGo: {e}")
-            # Fallback: retourne des résultats vides
+            response = requests.post(
+                self.serper_url,
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            # repon
+            
+            # Extraire les résultats organiques Google
+            results = []
+            for item in data.get('organic', []):
+                results.append({
+                    'title': item.get('title', ''),
+                    'link': item.get('link', ''),
+                    'snippet': item.get('snippet', ''),
+                    'source': item.get('source', ''),
+                    'date': item.get('date', ''),
+                    'position': item.get('position', 0),
+                    'sitelinks': item.get('sitelinks', [])
+                })
+            
+            return results
+            
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 401:
+                logger.error("❌ Clé API Serper invalide")
+            elif e.response.status_code == 429:
+                logger.error("❌ Limite de requêtes Serper dépassée (100 gratuites/mois)")
+            elif e.response.status_code == 400:
+                logger.error(f"❌ Requête Serper invalide: {e.response.text}")
+            else:
+                logger.error(f"❌ Erreur HTTP Serper: {e}")
             return []
-        
-        logger.debug(f"   🔍 {len(results)} résultats pour '{keyword}'")
-        return results
+        except requests.exceptions.Timeout:
+            logger.error("⏰ Timeout requête Serper")
+            return []
+        except Exception as e:
+            logger.error(f"❌ Erreur requête Serper: {e}")
+            return []
     
     def _is_valid_url(self, url: str) -> bool:
-        """Filtre les URLs non pertinentes"""
-        # Exclure les domaines non pertinents
-        excluded_domains = [
-            'linkedin.com', 'facebook.com', 'twitter.com', 'instagram.com',
-            'youtube.com', 'tiktok.com', 'pinterest.com'
-        ]
-        
-        parsed = urlparse(url)
-        domain = parsed.netloc.lower()
-        
-        # Exclure les réseaux sociaux
-        if any(excl in domain for excl in excluded_domains):
+        """Filtre les URLs non pertinentes ou dangereuses"""
+        try:
+            parsed = urlparse(url)
+            
+            # Accepter uniquement http/https
+            if parsed.scheme not in ['http', 'https']:
+                return False
+            
+            domain = parsed.netloc.lower()
+            
+            # Exclure les réseaux sociaux (contenu non structuré)
+            excluded_domains = [
+                'linkedin.com', 'facebook.com', 'twitter.com', 'x.com',
+                'instagram.com', 'youtube.com', 'tiktok.com', 'pinterest.com'
+            ]
+            if any(excl in domain for excl in excluded_domains):
+                return False
+            
+            # Exclure les URLs avec patterns d'emploi
+            excluded_patterns = ['/job', '/career', '/emploi', '/recrutement', '/hiring', '/postuler']
+            if any(pat in url.lower() for pat in excluded_patterns):
+                return False
+            
+            # Exclure les URLs trop courtes ou suspectes
+            if len(url) < 20 or 'javascript:' in url.lower():
+                return False
+            
+            return True
+            
+        except Exception:
             return False
-        
-        # Exclure les URLs avec certains patterns
-        excluded_patterns = ['/job', '/career', '/emploi', '/recrutement', '/hiring']
-        if any(pat in url.lower() for pat in excluded_patterns):
-            return False
-        
-        # Accepter uniquement http/https
-        if parsed.scheme not in ['http', 'https']:
-            return False
-        
-        return True
     
     def _analyze_page(self, url: str) -> Optional[Dict]:
         """Télécharge et analyse le contenu d'une page"""
@@ -230,24 +285,26 @@ class WebSearchScraper(BaseScraper):
             headers = {
                 'User-Agent': self._get_random_user_agent(),
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'fr-FR,fr;q=0.9',
+                'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+                'Connection': 'keep-alive',
             }
             
-            response = requests.get(url, headers=headers, timeout=20, allow_redirects=True)
+            response = requests.get(url, headers=headers, timeout=25, allow_redirects=True)
             response.raise_for_status()
             
             # Vérifier le type de contenu
             content_type = response.headers.get('Content-Type', '').lower()
             
-            # Si c'est un document direct (PDF, etc.)
-            if any(ext in content_type for ext in ['pdf', 'msword', 'excel', 'csv']):
+            # Si c'est un document direct (PDF, Word, etc.)
+            if any(doc_type in content_type for doc_type in ['pdf', 'msword', 'excel', 'csv', 'vnd.openxmlformats']):
                 return {
                     'is_document': True,
                     'content_type': content_type,
                     'content': response.content,
-                    'text': '',
+                    'text': self._parse_binary_content(response.content, content_type),
                     'links': [],
-                    'title': url.split('/')[-1]
+                    'title': Path(url).name or 'Document',
+                    'url': url
                 }
             
             # Parser le HTML
@@ -257,88 +314,108 @@ class WebSearchScraper(BaseScraper):
             
             # Extraire le texte principal
             text_content = self._extract_main_text(soup)
+            if len(text_content.strip()) < 50:  # Page trop vide
+                return None
             
             # Extraire les liens vers des documents
             document_links = self._find_document_links(soup, url)
             
             # Extraire les métadonnées
-            title = soup.find('title')
-            title_text = title.text.strip() if title else ''
+            title = self._get_meta_tag(soup, 'title') or soup.find('title')
+            title_text = title.text.strip() if title else Path(url).name
             
             return {
                 'is_document': False,
                 'content_type': content_type,
-                'text': text_content,
+                'text': text_content[:15000],  # Limiter à 15k caractères
                 'links': document_links,
-                'title': title_text,
-                'meta_description': self._get_meta_tag(soup, 'description'),
-                'html': response.text[:50000]  # Limiter la taille
+                'title': title_text[:200],
+                'meta_description': self._get_meta_tag(soup, 'description')[:300],
+                'meta_keywords': self._get_meta_tag(soup, 'keywords'),
+                'url': url,
+                'response_status': response.status_code
             }
             
+        except requests.exceptions.Timeout:
+            logger.debug(f"   ⏰ Timeout chargement page: {url[:60]}")
+            return None
         except requests.exceptions.RequestException as e:
-            logger.debug(f"   Erreur chargement page: {e}")
+            logger.debug(f"   ❌ Erreur HTTP: {e}")
             return None
         except Exception as e:
-            logger.debug(f"   Erreur analyse page: {e}")
+            logger.debug(f"   ❌ Erreur analyse page: {e}")
             return None
     
     def _extract_main_text(self, soup) -> str:
         """Extrait le texte principal d'une page HTML"""
         # Supprimer les éléments non pertinents
-        for element in soup(['script', 'style', 'nav', 'footer', 'header']):
-            element.decompose()
+        for tag in soup(['script', 'style', 'nav', 'footer', 'header', 'aside']):
+            tag.decompose()
         
-        # Chercher le contenu principal
+        # Chercher le contenu principal par ordre de priorité
         main_content = (
             soup.find('main') or 
             soup.find('article') or 
             soup.find('div', class_='content') or
             soup.find('div', id='content') or
+            soup.find('div', class_='article') or
             soup.body
         )
         
         if main_content:
             text = main_content.get_text(separator='\n', strip=True)
-            # Nettoyer le texte
+            # Nettoyer: espaces multiples, lignes vides
             text = re.sub(r'\n{3,}', '\n\n', text)
-            return text[:10000]  # Limiter à 10k caractères
+            text = re.sub(r'[ \t]+', ' ', text)
+            return text.strip()[:12000]  # Limiter à 12k caractères
         
-        return soup.get_text(strip=True)[:5000]
+        return soup.get_text(separator=' ', strip=True)[:5000]
     
     def _find_document_links(self, soup, base_url: str) -> List[Dict]:
         """Trouve les liens vers des documents téléchargeables"""
         documents = []
+        seen_urls = set()
         
         for link in soup.find_all('a', href=True):
-            href = link['href']
+            href = link['href'].strip()
+            if not href or href.startswith('#') or href.startswith('javascript:'):
+                continue
+            
             text = link.get_text(strip=True).lower()
             
-            # Vérifier si c'est un lien vers un document
-            if any(href.lower().endswith(ext) for ext in self.document_extensions):
+            # Vérifier si c'est un lien vers un document par extension
+            if any(href.lower().split('?')[0].endswith(ext) for ext in self.document_extensions):
                 full_url = urljoin(base_url, href)
-                documents.append({
-                    'url': full_url,
-                    'text': text or href.split('/')[-1],
-                    'extension': Path(href).suffix.lower()
-                })
+                if full_url not in seen_urls:
+                    seen_urls.add(full_url)
+                    documents.append({
+                        'url': full_url,
+                        'text': text or Path(href).name,
+                        'extension': Path(href).suffix.lower().split('?')[0]
+                    })
+            
             # Ou si le texte du lien indique un document
-            elif any(kw in text for kw in ['pdf', 'télécharger', 'download', 'doc', 'excel']):
+            elif any(kw in text for kw in ['pdf', 'télécharger', 'download', 'doc', 'excel', 'dossier']):
                 full_url = urljoin(base_url, href)
-                # Essayer de détecter l'extension
                 ext = self._detect_extension_from_url(full_url)
-                if ext:
+                if ext and full_url not in seen_urls:
+                    seen_urls.add(full_url)
                     documents.append({
                         'url': full_url,
                         'text': text,
                         'extension': ext
                     })
+            
+            # Limiter à 10 documents max par page
+            if len(documents) >= 10:
+                break
         
-        return documents[:10]  # Limiter à 10 documents par page
+        return documents
     
     def _detect_extension_from_url(self, url: str) -> Optional[str]:
         """Détecte l'extension de fichier depuis une URL"""
         parsed = urlparse(url)
-        path = parsed.path.lower()
+        path = parsed.path.lower().split('?')[0]  # Supprimer les paramètres
         
         for ext in self.document_extensions:
             if path.endswith(ext):
@@ -347,9 +424,15 @@ class WebSearchScraper(BaseScraper):
     
     def _is_relevant_content(self, page_data: Dict) -> bool:
         """Détermine si le contenu concerne un appel d'offre"""
-        text = (page_data.get('title', '') + ' ' + 
-                page_data.get('text', '') + ' ' + 
-                page_data.get('meta_description', '')).lower()
+        text = (
+            page_data.get('title', '') + ' ' + 
+            page_data.get('text', '') + ' ' + 
+            page_data.get('meta_description', '') + ' ' +
+            page_data.get('meta_keywords', '')
+        ).lower()
+        
+        if len(text.strip()) < 100:
+            return False
         
         # Doit contenir au moins un mot-clé pertinent
         has_relevant = any(kw in text for kw in self.relevant_keywords)
@@ -371,7 +454,7 @@ class WebSearchScraper(BaseScraper):
         # Titre
         offre_title = title or self._extract_title_from_text(text) or keyword
         
-        # Description
+        # Description (snippet pertinent)
         description = self._extract_snippet(text, max_length=500)
         
         # Date de publication (approximative)
@@ -397,49 +480,61 @@ class WebSearchScraper(BaseScraper):
             'employment_type': employment_type,
             'date_publication': date_pub,
             'company_name': company,
-            'tags': ['web-search', keyword, 'auto-detect'],
-            'source_type': 'web_search',
+            'tags': ['google', 'serper', 'web-search', keyword, 'auto-detect'],
+            'source_type': 'google_serper_api',
             'search_keyword': keyword,
             'content_preview': text[:1000],
+            'meta_description': page_data.get('meta_description', ''),
             'scraped_at': datetime.utcnow().isoformat()
         }
     
     def _extract_title_from_text(self, text: str) -> Optional[str]:
         """Extrait un titre potentiel depuis le texte"""
-        lines = [l.strip() for l in text.split('\n') if len(l.strip()) > 20]
-        for line in lines[:10]:  # Chercher dans les premières lignes
-            if any(kw in line.lower() for kw in self.relevant_keywords):
-                return line[:150]
+        lines = [l.strip() for l in text.split('\n') if 20 < len(l.strip()) < 150]
+        
+        for line in lines[:15]:  # Chercher dans les premières lignes pertinentes
+            line_lower = line.lower()
+            if any(kw in line_lower for kw in self.relevant_keywords):
+                # Nettoyer le titre
+                title = re.sub(r'\s*[-–|•]\s*.*$', '', line)  # Supprimer suffixes
+                return title.strip()[:150]
         return None
     
     def _extract_snippet(self, text: str, max_length: int = 500) -> str:
         """Extrait un snippet pertinent du texte"""
         # Chercher les phrases contenant des mots-clés
         sentences = re.split(r'[.!?]+', text)
+        
         for sentence in sentences:
             sentence = sentence.strip()
-            if len(sentence) > 30 and any(kw in sentence.lower() for kw in self.relevant_keywords):
-                return sentence[:max_length] + ('...' if len(sentence) > max_length else '')
+            if 30 < len(sentence) < max_length:
+                if any(kw in sentence.lower() for kw in self.relevant_keywords):
+                    return sentence + ('...' if len(sentence) >= max_length - 3 else '')
         
-        # Fallback: premières lignes
-        lines = [l.strip() for l in text.split('\n') if len(l.strip()) > 10]
+        # Fallback: premières lignes non vides
+        lines = [l.strip() for l in text.split('\n') if len(l.strip()) > 20]
         return ' '.join(lines[:3])[:max_length]
     
     def _extract_date_from_content(self, text: str) -> datetime:
         """Extrait une date depuis le contenu"""
-        # Patterns de date courants
         patterns = [
-            r'(\d{1,2}/\d{1,2}/\d{4})',
-            r'(\d{4}-\d{1,2}-\d{1,2})',
-            r'(\d{1,2}\s+[a-zA-Z]+\s+\d{4})',
-            r'(publié\s+le\s+[\d\s/a-zA-Z]+)',
+            # Formats français
+            (r'(\d{1,2}/\d{1,2}/\d{4})', lambda x: self._normalize_date(x)),
+            (r'(\d{1,2}\s+[a-zA-Z]+\s+\d{4})', lambda x: self._normalize_date(x)),
+            (r'publié\s+(?:le\s+)?([\d\s/a-zA-Z]+)', lambda x: self._normalize_date(x)),
+            (r'date\s*[:\s]+([\d\s/a-zA-Z]+)', lambda x: self._normalize_date(x)),
+            # Formats ISO/US
+            (r'(\d{4}-\d{1,2}-\d{1,2})', lambda x: self._normalize_date(x)),
+            # Relatif
+            (r'il y a\s+(\d+)\s+jours?', lambda x: datetime.utcnow() - timedelta(days=int(x))),
+            (r'il y a\s+(\d+)\s+semaines?', lambda x: datetime.utcnow() - timedelta(weeks=int(x))),
         ]
         
-        for pattern in patterns:
+        for pattern, converter in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 try:
-                    return self._normalize_date(match.group(1))
+                    return converter(match.group(1))
                 except:
                     continue
         
@@ -448,15 +543,26 @@ class WebSearchScraper(BaseScraper):
     def _extract_location(self, text: str) -> Optional[str]:
         """Extrait la localisation depuis le texte"""
         locations = {
-            'abidjan': 'Abidjan', 'bouaké': 'Bouaké', 'yamoussoukro': 'Yamoussoukro',
-            'san-pédro': 'San-Pédro', 'korhogo': 'Korhogo', 'daloa': 'Daloa',
-            'côte d\'ivoire': 'Côte d\'Ivoire', 'cote d\'ivoire': 'Côte d\'Ivoire',
-            'ivory coast': 'Côte d\'Ivoire'
+            'abidjan': 'Abidjan',
+            'bouaké': 'Bouaké', 'bouake': 'Bouaké',
+            'yamoussoukro': 'Yamoussoukro',
+            'san-pédro': 'San-Pédro', 'san pedro': 'San-Pédro',
+            'korhogo': 'Korhogo',
+            'daloa': 'Daloa',
+            'man': 'Man',
+            'gagnoa': 'Gagnoa',
+            'divo': 'Divo',
+            'bondoukou': 'Bondoukou',
+            'côte d\'ivoire': 'Côte d\'Ivoire',
+            'cote d\'ivoire': 'Côte d\'Ivoire',
+            'ivory coast': 'Côte d\'Ivoire',
+            'ci': 'Côte d\'Ivoire'
         }
         
         text_lower = text.lower()
         for key, value in locations.items():
-            if key in text_lower:
+            # Vérifier que c'est un mot complet (pas "ci" dans "microsoft")
+            if re.search(r'\b' + re.escape(key) + r'\b', text_lower):
                 return value
         return None
     
@@ -465,11 +571,12 @@ class WebSearchScraper(BaseScraper):
         text_lower = text.lower()
         
         classifications = [
-            (['informatique', 'réseau', 'cyber', 'microsoft', 'application', 'système'], 'Appel d\'offre - Informatique'),
-            (['batiment', 'construction', 'travaux', 'infrastructure'], 'Appel d\'offre - BTP'),
-            (['matériel', 'équipement', 'fourniture', 'acquisition'], 'Appel d\'offre - Fournitures'),
-            (['consultation', 'étude', 'expertise', 'conseil'], 'Appel d\'offre - Consultance'),
-            (['vente', 'commercial', 'distribution'], 'Appel d\'offre - Commercial'),
+            (['informatique', 'réseau', 'cyber', 'microsoft', 'application', 'système', 'logiciel'], 'Appel d\'offre - Informatique'),
+            (['batiment', 'construction', 'travaux', 'infrastructure', 'génie civil', 'btp'], 'Appel d\'offre - BTP'),
+            (['matériel', 'équipement', 'fourniture', 'acquisition', 'achat'], 'Appel d\'offre - Fournitures'),
+            (['consultance', 'consulting', 'étude', 'expertise', 'conseil', 'audit'], 'Appel d\'offre - Consultance'),
+            (['formation', 'training', 'capacitation', 'renforcement'], 'Appel d\'offre - Formation'),
+            (['service', 'prestation', 'maintenance', 'support', 'assistance'], 'Appel d\'offre - Services'),
         ]
         
         for keywords, category in classifications:
@@ -480,24 +587,26 @@ class WebSearchScraper(BaseScraper):
     
     def _extract_organization(self, text: str) -> Optional[str]:
         """Tente d'extraire le nom de l'organisme"""
-        # Patterns courants pour les organismes en CI
+        # Patterns pour organismes en Côte d'Ivoire
         patterns = [
-            r'(?:ministère|direction|agence|office|société)\s+[^.\n]{10,50}',
-            r'[A-Z]{2,}(?:\s+[A-Z][a-z]+){2,}',  # Acronymes
+            r'(?:ministère|direction|agence|office|société|établissement)\s+[^.\n]{10,60}',
+            r'(?:république\s+de\s+)?c[oô]te\s+d\'?ivoire[^.\n]{0,30}',
+            r'[A-Z]{2,}(?:\s+[A-Z][a-z]+){2,}',  # Acronymes comme ARMP, PRICI
         ]
         
         for pattern in patterns:
-            match = re.search(pattern, text)
+            match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 org = match.group(0).strip()
-                if 10 < len(org) < 100:  # Validation basique
+                # Validation basique
+                if 10 < len(org) < 100 and org.lower() not in ['côte d\'ivoire', 'république de côte d\'ivoire']:
                     return org
         return None
     
     def _download_documents(self, page_url: str, page_data: Dict) -> List[Dict]:
         """Télécharge et parse les documents trouvés"""
         if not DOCUMENT_PARSING_AVAILABLE:
-            logger.debug("   ⚠️  Parsing de documents désactivé")
+            logger.debug("   ⚠️  Parsing de documents désactivé (libs manquantes)")
             return []
         
         downloaded = []
@@ -511,17 +620,21 @@ class WebSearchScraper(BaseScraper):
                 logger.debug(f"   📥 Téléchargement: {url[:60]}...")
                 
                 # Télécharger le fichier
-                response = requests.get(url, timeout=30, stream=True)
+                response = requests.get(url, timeout=40, stream=True, headers={
+                    'User-Agent': self._get_random_user_agent()
+                })
                 response.raise_for_status()
                 
-                # Nommer le fichier
+                # Nommer le fichier de façon unique
                 filename = self._sanitize_filename(doc['text'] or Path(url).name)
-                filepath = self.download_folder / f"{datetime.utcnow().strftime('%Y%m%d')}_{filename}"
+                timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+                filepath = self.download_folder / f"{timestamp}_{filename}"
                 
                 # Sauvegarder le fichier
                 with open(filepath, 'wb') as f:
                     for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
+                        if chunk:
+                            f.write(chunk)
                 
                 # Parser le contenu si possible
                 content_text = self._parse_document(filepath, ext)
@@ -536,62 +649,104 @@ class WebSearchScraper(BaseScraper):
                     'downloaded_at': datetime.utcnow().isoformat()
                 })
                 
-                logger.debug(f"   ✅ Document téléchargé: {filename}")
+                logger.debug(f"   ✅ Document téléchargé: {filename} ({os.path.getsize(filepath)} bytes)")
                 
+            except requests.exceptions.RequestException as e:
+                logger.debug(f"   ❌ Erreur téléchargement {url[:50]}: {e}")
+                continue
             except Exception as e:
-                logger.debug(f"   ❌ Erreur téléchargement {doc['url']}: {e}")
+                logger.debug(f"   ❌ Erreur traitement document: {e}")
                 continue
         
         return downloaded
     
-    def _sanitize_filename(self, filename: str) -> str:
-        """Nettoie un nom de fichier pour le stockage"""
-        # Supprimer les caractères invalides
-        filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
-        # Limiter la longueur
-        return filename[:100] or 'document'
+    def _parse_binary_content(self, content: bytes, content_type: str) -> str:
+        """Parse le contenu binaire d'un document"""
+        if not DOCUMENT_PARSING_AVAILABLE:
+            return ""
+        
+        try:
+            if 'pdf' in content_type and 'PyPDF2' in globals():
+                from io import BytesIO
+                reader = PyPDF2.PdfReader(BytesIO(content))
+                text = ''
+                for page in reader.pages[:10]:  # Limiter aux 10 premières pages
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + '\n'
+                return text[:10000]
+            
+            elif 'msword' in content_type or 'openxmlformats-officedocument.wordprocessingml' in content_type:
+                from io import BytesIO
+                doc = WordDocument(BytesIO(content))
+                return '\n'.join([p.text for p in doc.paragraphs])[:10000]
+            
+        except Exception as e:
+            logger.debug(f"   Erreur parsing binaire: {e}")
+        
+        return ""
     
     def _parse_document(self, filepath: Path, ext: str) -> Optional[str]:
-        """Extrait le texte d'un document"""
+        """Extrait le texte d'un document local"""
+        if not DOCUMENT_PARSING_AVAILABLE:
+            return None
+        
         try:
             if ext == '.pdf' and 'PyPDF2' in globals():
                 with open(filepath, 'rb') as f:
                     reader = PyPDF2.PdfReader(f)
                     text = ''
-                    for page in reader.pages[:5]:  # Limiter aux 5 premières pages
-                        text += page.extract_text() or ''
-                    return text
+                    for page in reader.pages[:10]:  # Limiter aux 10 premières pages
+                        page_text = page.extract_text()
+                        if page_text:
+                            text += page_text + '\n'
+                    return text[:10000]
             
             elif ext in ['.doc', '.docx'] and 'WordDocument' in globals():
                 doc = WordDocument(str(filepath))
-                return '\n'.join([p.text for p in doc.paragraphs])
+                return '\n'.join([p.text for p in doc.paragraphs])[:10000]
             
             elif ext in ['.xls', '.xlsx'] and 'openpyxl' in globals():
                 wb = openpyxl.load_workbook(filepath, data_only=True)
                 texts = []
-                for sheet in wb.worksheets[:2]:  # 2 premières feuilles
+                for sheet in wb.worksheets[:3]:  # 3 premières feuilles
                     for row in sheet.iter_rows(values_only=True):
-                        texts.append(' | '.join(str(c) for c in row if c is not None))
-                return '\n'.join(texts[:50])  # Limiter
+                        row_text = ' | '.join(str(c) for c in row if c is not None)
+                        if row_text.strip():
+                            texts.append(row_text)
+                return '\n'.join(texts[:100])[:10000]
             
             elif ext == '.csv' and 'pandas' in globals():
-                df = pd.read_csv(filepath, nrows=20)
-                return df.to_string()
+                df = pd.read_csv(filepath, nrows=50, on_bad_lines='skip')
+                return df.to_string()[:10000]
             
         except Exception as e:
-            logger.debug(f"   Erreur parsing {filepath}: {e}")
+            logger.debug(f"   Erreur parsing {filepath.name}: {e}")
         
         return None
     
+    def _sanitize_filename(self, filename: str) -> str:
+        """Nettoie un nom de fichier pour le stockage sécurisé"""
+        # Supprimer les caractères invalides pour Windows/Linux
+        filename = re.sub(r'[<>:"/\\|?*\x00-\x1F]', '_', filename)
+        # Supprimer les espaces multiples
+        filename = re.sub(r'\s+', '_', filename)
+        # Limiter la longueur
+        name, ext = os.path.splitext(filename)
+        return f"{name[:80]}{ext}" or 'document'
+    
     def _get_meta_tag(self, soup, name: str) -> str:
-        """Extrait une balise meta"""
-        meta = soup.find('meta', attrs={'name': name}) or soup.find('meta', attrs={'property': name})
+        """Extrait une balise meta par nom ou property"""
+        meta = (soup.find('meta', attrs={'name': name}) or 
+                soup.find('meta', attrs={'property': name}) or
+                soup.find('meta', attrs={'itemprop': name}))
         return meta.get('content', '').strip() if meta else ''
     
     def _get_random_user_agent(self) -> str:
-        """Retourne un User-Agent réaliste"""
+        """Retourne un User-Agent réaliste et varié"""
         return random.choice([
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
         ])

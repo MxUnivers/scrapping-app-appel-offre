@@ -32,24 +32,24 @@ class ScraperManager:
             # Scrapers de base
             WebSearchScraper(),  # OU WebSearchSerperScraper()
 
-            EmploiCiScraper(),
-            ArmpScraper(),
+            # EmploiCiScraper(),
+            # ArmpScraper(),
             
-            # Sites d'appels d'offres Côte d'Ivoire
-            J360InfoScraper(),
-            MarchesPublicsCiScraper(),
-            EducarriereCiScraper(),
-            PriciCiScraper(),  # Gère 2 URLs: travaux + fournitures
-            FerCiScraper(),
-            ArcopCiScraper(),
-            EauxEtForetsGouvCiScraper(),
-            CosoCiScraper(),
-            BceaoIntScraper(),
-            BatiriciCiScraper(),
-            OnadCiScraper(),
-            CorisBankCiScraper(),
-            FacebookCimarchesScraper(),  # ⚠️ Limité
-            LinkedInCiScraper(),  # ← NOUVEAU
+            # # Sites d'appels d'offres Côte d'Ivoire
+            # J360InfoScraper(),
+            # MarchesPublicsCiScraper(),
+            # EducarriereCiScraper(),
+            # PriciCiScraper(),  # Gère 2 URLs: travaux + fournitures
+            # FerCiScraper(),
+            # ArcopCiScraper(),
+            # EauxEtForetsGouvCiScraper(),
+            # CosoCiScraper(),
+            # BceaoIntScraper(),
+            # BatiriciCiScraper(),
+            # OnadCiScraper(),
+            # CorisBankCiScraper(),
+            # FacebookCimarchesScraper(),  # ⚠️ Limité
+            # LinkedInCiScraper(),  # ← NOUVEAU
         ]
         
         logger.info(f"✅ ScraperManager initialisé avec {len(self.scrapers)} sources")

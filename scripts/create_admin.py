@@ -4,128 +4,136 @@ Script pour créer les administrateurs par défaut
 Exécution: python scripts/create_admin.py
 """
 
-from mongoengine import connect
 import os
 import sys
+from pathlib import Path
+
+# Ajouter la racine du projet au path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from mongoengine import connect
 from dotenv import load_dotenv
 from models.user import User
 
 # Charger les variables d'environnement
 load_dotenv()
 
+
+def get_mongo_connection():
+    """Connexion MongoDB compatible Atlas + localhost"""
+    uri = os.getenv('MONGODB_URI', 'mongodb://localhost:27017')
+    db = os.getenv('MONGODB_DB', 'ci_offres_db')
+    user = os.getenv('MONGODB_USER', '')
+    passwd = os.getenv('MONGODB_PASS', '')
+
+    settings = {'host': uri, 'db': db}
+
+    # Ajouter user/pass seulement s'ils sont définis
+    # (si déjà dans l'URI Atlas, ne pas les répéter)
+    if user and passwd and user not in uri:
+        settings['username'] = user
+        settings['password'] = passwd
+        settings['authentication_source'] = 'admin'
+
+    connect(**settings)
+
+
 def create_default_admins():
     """Crée les administrateurs par défaut s'ils n'existent pas"""
-    
+
     # Connexion MongoDB
     try:
-        connect(
-            host=os.getenv('MONGODB_URI', 'mongodb://localhost:27017'),
-            db=os.getenv('MONGODB_DB', 'ci_offres_db'),
-            username=os.getenv('MONGODB_USER', ''),
-            password=os.getenv('MONGODB_PASS', ''),
-            authentication_source='admin'
-        )
+        get_mongo_connection()
         print("✅ Connecté à MongoDB")
     except Exception as e:
         print(f"❌ Erreur connexion MongoDB: {e}")
         print("💡 Assurez-vous que MongoDB est démarré")
         sys.exit(1)
-    
-    # Configuration des admins depuis .env ou valeurs par défaut
+
+    # =========================================================
+    # Les 3 admins lus depuis le .env
+    # =========================================================
     admins_config = [
         {
-            'email': os.getenv('DEFAULT_ADMIN_EMAIL', 'admin@cioffres.ci'),
-            'first_name': os.getenv('DEFAULT_ADMIN_FIRST_NAME', 'Aymar'),
-            'last_name': os.getenv('DEFAULT_ADMIN_LAST_NAME', 'Bly'),
-            'is_super_admin': True,
+            'email':      'aymarbly559@gmail.com',
+            'first_name': 'Aymar',
+            'last_name':    'Bly',
+            'role':       'super_admin',
         },
         {
-            'email': os.getenv('ADMIN_2_EMAIL', 'privat.kouadio@infosoluces.ci'),
-            'first_name': os.getenv('ADMIN_2_FIRST_NAME', 'Privat'),
-            'last_name': os.getenv('ADMIN_2_LAST_NAME', 'Kouadio'),
-            'is_super_admin': False,
+            'email':      'privat.kouadio@infosoluces.ci',
+            'first_name': 'Privat',
+            'last_name':  'Kouadio',
+            'role':       'admin',
         },
         {
-            'email': os.getenv('ADMIN_3_EMAIL', 'tidiane.diabate@infosoluces.ci'),  # Correction orthographe
-            'first_name': os.getenv('ADMIN_3_FIRST_NAME', 'Tidiane'),
-            'last_name': os.getenv('ADMIN_3_LAST_NAME', 'Diabaté'),
-            'is_super_admin': False,
+            'email':      'tidiane.diabate@infosoluces.ci',
+            'first_name': 'Tidiane',
+            'last_name':  'Diabaté',
+            'role':       'admin',
         },
     ]
-    
-    # Mot de passe commun (à changer après première connexion !)
+
     default_password = os.getenv('DEFAULT_ADMIN_PASSWORD', 'Admin123!')
-    
-    created_count = 0
+
+    created_count  = 0
     existing_count = 0
-    error_count = 0
-    
-    print(f"\n🔐 Création des administrateurs avec mot de passe: {'*' * len(default_password)}")
+    error_count    = 0
+
+    print(f"\n🔐 Mot de passe commun: {'*' * len(default_password)}")
     print("-" * 60)
-    
-    for i, config in enumerate(admins_config, 1):
-        email = config['email']
-        first_name = config['first_name']
-        last_name = config['last_name']
-        is_super = config['is_super_admin']
-        
-        print(f"\n[{i}/{len(admins_config)}] Traitement: {first_name} {last_name} <{email}>")
-        
+
+    for i, cfg in enumerate(admins_config, 1):
+        email      = cfg['email']
+        first_name = cfg['first_name']
+        last_name  = cfg['last_name']
+        role       = cfg['role']
+
+        print(f"\n[{i}/{len(admins_config)}] {first_name} {last_name} <{email}> [{role}]")
+
         try:
-            # Vérifier si l'utilisateur existe déjà
-            existing_user = User.objects(email=email).first()
-            
-            if existing_user:
-                print(f"   ⚠️  Utilisateur existe déjà")
-                print(f"      ID: {existing_user.id}")
-                print(f"      Admin: {existing_user.is_admin}")
-                print(f"      Actif: {existing_user.is_active}")
+            existing = User.objects(email=email).first()
+
+            if existing:
+                print(f"   ⚠️  Existe déjà  (ID: {existing.id})")
                 existing_count += 1
                 continue
-            
-            # Créer le nouvel admin
+
             admin = User(
                 email=email,
                 first_name=first_name,
                 last_name=last_name,
-                is_admin=True,  # Tous sont admins
-                is_active=True
+                is_admin=True,
+                is_active=True,
+                role=role,
+                email_verified=True,  # Pas besoin de vérification pour les admins
             )
             admin.set_password(default_password)
             admin.save()
-            
-            print(f"   ✅ Admin créé avec succès!")
-            print(f"      ID: {admin.id}")
+
+            print(f"   ✅ Créé avec succès! (ID: {admin.id})")
             created_count += 1
-            
+
         except Exception as e:
             print(f"   ❌ Erreur: {e}")
             error_count += 1
-            continue
-    
-    # Résumé final
+
+    # Résumé
     print("\n" + "=" * 60)
-    print("📊 RÉCAPITULATIF CRÉATION ADMINS")
+    print("📊 RÉCAPITULATIF")
     print("=" * 60)
-    print(f"   ✅ Créés: {created_count}")
-    print(f"   ⚠️  Déjà existants: {existing_count}")
-    print(f"   ❌ Erreurs: {error_count}")
-    print(f"   📦 Total traités: {len(admins_config)}")
+    print(f"   ✅ Créés          : {created_count}")
+    print(f"   ⚠️  Déjà existants : {existing_count}")
+    print(f"   ❌ Erreurs        : {error_count}")
     print("=" * 60)
-    
+
     if created_count > 0:
-        print("\n🔑 MOT DE PASSE COMMUN (à changer après première connexion):")
-        print(f"   {default_password}")
-        print("\n🌐 URL de connexion:")
-        print("   http://localhost:5000/auth/login")
-        print("\n⚠️  SÉCURITÉ:")
-        print("   - Changez les mots de passe après la première connexion")
-        print("   - Ne partagez jamais ces informations")
-        print("   - Utilisez un mot de passe unique par utilisateur en production")
-    
+        print(f"\n🔑 Mot de passe commun : {default_password}")
+        print("🌐 URL de connexion    : http://localhost:5000/auth/login")
+        print("\n⚠️  Changez les mots de passe après la première connexion!")
+
     print("=" * 60 + "\n")
-    
-    # Retourner un statut pour usage programmatique
+
     return {
         'success': error_count == 0,
         'created': created_count,
@@ -137,47 +145,40 @@ def create_default_admins():
 def list_existing_admins():
     """Liste tous les admins existants dans la base"""
     try:
-        connect(
-            host=os.getenv('MONGODB_URI', 'mongodb://localhost:27017'),
-            db=os.getenv('MONGODB_DB', 'ci_offres_db'),
-            username=os.getenv('MONGODB_USER', ''),
-            password=os.getenv('MONGODB_PASS', ''),
-            authentication_source='admin'
-        )
-        
+        get_mongo_connection()
+
         admins = User.objects(is_admin=True).order_by('email')
-        
+
         if not admins:
-            print("ℹ️  Aucun administrateur trouvé dans la base")
+            print("ℹ️  Aucun administrateur trouvé")
             return
-        
-        print(f"\n👥 Administrateurs existants ({admins.count()}):")
-        print("-" * 70)
-        print(f"{'Email':<45} {'Nom':<25} {'Actif':<6}")
-        print("-" * 70)
-        
+
+        print(f"\n👥 Administrateurs ({admins.count()}):")
+        print("-" * 75)
+        print(f"{'Email':<40} {'Nom':<20} {'Rôle':<12} {'Actif'}")
+        print("-" * 75)
+
         for admin in admins:
             status = "✅" if admin.is_active else "❌"
-            print(f"{admin.email:<45} {admin.first_name} {admin.last_name:<20} {status}")
-        
-        print("-" * 70 + "\n")
-        
+            print(f"{admin.email:<40} {admin.first_name} {admin.last_name:<15} {admin.role:<12} {status}")
+
+        print("-" * 75 + "\n")
+
     except Exception as e:
-        print(f"❌ Erreur liste admins: {e}")
+        print(f"❌ Erreur: {e}")
 
 
 if __name__ == '__main__':
     import argparse
-    
+
     parser = argparse.ArgumentParser(description='Gestion des administrateurs CI Offres')
-    parser.add_argument('--list', action='store_true', help='Lister les admins existants')
-    parser.add_argument('--create', action='store_true', help='Créer les admins par défaut (défaut)')
-    
+    parser.add_argument('--list',   action='store_true', help='Lister les admins existants')
+    parser.add_argument('--create', action='store_true', help='Créer les admins (défaut)')
+
     args = parser.parse_args()
-    
+
     if args.list:
         list_existing_admins()
     else:
         result = create_default_admins()
-        # Code de sortie pour usage CI/CD
         sys.exit(0 if result['success'] else 1)
