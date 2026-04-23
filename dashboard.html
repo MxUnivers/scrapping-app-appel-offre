@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AO Tracker — INFOSOLUCES</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@500;700&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:     #0d0f14;
+      --bg2:    #13161e;
+      --bg3:    #1c2030;
+      --border: #242836;
+      --text:   #e2e4ec;
+      --muted:  #6b7090;
+      --accent: #f0a500;
+      --green:  #3ecf8e;
+      --red:    #f87171;
+      --blue:   #60a5fa;
+      --purple: #a78bfa;
+      --font:   'Syne', sans-serif;
+      --mono:   'IBM Plex Mono', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; min-height: 100vh; }
+
+    /* ── Top bar ── */
+    header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; }
+    .logo { font-size: 18px; font-weight: 700; letter-spacing: -.5px; }
+    .logo span { color: var(--accent); }
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    .badge-live { background: #1a2a1a; color: var(--green); border: 1px solid #2a4a2a; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-family: var(--mono); display: flex; align-items: center; gap: 6px; }
+    .dot { width: 6px; height: 6px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    .btn { background: var(--accent); color: #0d0f14; border: none; padding: 8px 18px; border-radius: 6px; font-family: var(--font); font-weight: 700; font-size: 13px; cursor: pointer; transition: opacity .2s; }
+    .btn:hover { opacity: .85; }
+    .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); padding: 7px 16px; border-radius: 6px; font-family: var(--font); font-size: 13px; cursor: pointer; transition: border-color .2s; }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Layout ── */
+    .container { display: flex; height: calc(100vh - 57px); }
+
+    /* ── Sidebar ── */
+    aside { width: 220px; background: var(--bg2); border-right: 1px solid var(--border); padding: 20px 16px; flex-shrink: 0; overflow-y: auto; }
+    .sidebar-title { font-size: 10px; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px; }
+    .filter-group { margin-bottom: 24px; }
+    .filter-btn { display: block; width: 100%; text-align: left; background: transparent; border: none; color: var(--muted); padding: 8px 10px; border-radius: 6px; font-family: var(--font); font-size: 13px; cursor: pointer; transition: all .15s; margin-bottom: 2px; position: relative; }
+    .filter-btn:hover { background: var(--bg3); color: var(--text); }
+    .filter-btn.active { background: #1e1a0a; color: var(--accent); }
+    .filter-btn .count { float: right; background: var(--bg3); padding: 1px 7px; border-radius: 10px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+    .filter-btn.active .count { background: #2e2810; color: var(--accent); }
+
+    /* ── Main ── */
+    main { flex: 1; overflow-y: auto; padding: 24px 28px; }
+
+    /* ── KPI Cards ── */
+    .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+    .kpi { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 18px; position: relative; overflow: hidden; }
+    .kpi::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--accent-color, var(--accent)); }
+    .kpi.green { --accent-color: var(--green); }
+    .kpi.red   { --accent-color: var(--red); }
+    .kpi.blue  { --accent-color: var(--blue); }
+    .kpi-label { font-size: 11px; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+    .kpi-value { font-size: 32px; font-weight: 700; line-height: 1; }
+    .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 6px; font-family: var(--mono); }
+
+    /* ── Search bar ── */
+    .search-row { display: flex; gap: 10px; margin-bottom: 20px; }
+    .search-input { flex: 1; background: var(--bg2); border: 1px solid var(--border); color: var(--text); padding: 10px 14px; border-radius: 8px; font-family: var(--font); font-size: 14px; outline: none; transition: border-color .2s; }
+    .search-input:focus { border-color: var(--accent); }
+    .search-input::placeholder { color: var(--muted); }
+
+    /* ── Table ── */
+    .table-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .table-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .table-header-title { font-size: 13px; font-weight: 700; color: var(--text); }
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { background: var(--bg3); }
+    th { padding: 11px 16px; text-align: left; font-size: 10px; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 500; white-space: nowrap; }
+    td { padding: 13px 16px; border-top: 1px solid var(--border); vertical-align: middle; }
+    tr:hover td { background: var(--bg3); }
+
+    /* ── Sector badge ── */
+    .sector { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-family: var(--mono); font-weight: 500; }
+    .sector.dev      { background: #1a1a3a; color: var(--blue); }
+    .sector.reseau   { background: #1a2a2a; color: var(--green); }
+    .sector.securite { background: #2a1a2a; color: var(--purple); }
+    .sector.materiel { background: #2a1a0a; color: var(--accent); }
+    .sector.autre    { background: var(--bg3); color: var(--muted); }
+
+    /* ── Status badge ── */
+    .status { padding: 3px 9px; border-radius: 4px; font-size: 11px; font-family: var(--mono); }
+    .status.nouveau  { background: #0a1a2a; color: var(--blue); border: 1px solid #1a3a5a; }
+    .status.lu       { background: var(--bg3); color: var(--muted); border: 1px solid var(--border); }
+    .status.soumis   { background: #0a2a1a; color: var(--green); border: 1px solid #1a4a2a; }
+    .status.rejete   { background: #2a0a0a; color: var(--red); border: 1px solid #4a1a1a; }
+
+    /* ── Score bar ── */
+    .score-wrap { display: flex; align-items: center; gap: 8px; }
+    .score-bar { flex: 1; height: 4px; background: var(--bg3); border-radius: 2px; overflow: hidden; min-width: 60px; }
+    .score-fill { height: 100%; border-radius: 2px; background: var(--green); transition: width .3s; }
+    .score-fill.mid { background: var(--accent); }
+    .score-fill.low { background: var(--red); }
+    .score-num { font-family: var(--mono); font-size: 12px; color: var(--muted); min-width: 28px; }
+
+    /* ── Deadline ── */
+    .deadline { font-family: var(--mono); font-size: 12px; }
+    .deadline.urgent { color: var(--red); }
+    .deadline.soon   { color: var(--accent); }
+    .deadline.ok     { color: var(--muted); }
+
+    /* ── Title cell ── */
+    .td-title { max-width: 260px; }
+    .td-title a { color: var(--text); text-decoration: none; font-size: 13px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .td-title a:hover { color: var(--accent); }
+    .td-source { font-size: 11px; font-family: var(--mono); color: var(--muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ── Notification toast ── */
+    #toast { position: fixed; bottom: 24px; right: 24px; background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 12px 18px; border-radius: 8px; font-size: 13px; display: none; z-index: 999; font-family: var(--mono); }
+
+    /* ── Empty state ── */
+    .empty { text-align: center; padding: 60px; color: var(--muted); }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; opacity: .4; }
+    .empty-msg { font-size: 14px; }
+
+    /* ── Loading overlay ── */
+    #loading { display: none; position: fixed; inset: 0; background: rgba(13,15,20,.7); z-index: 100; align-items: center; justify-content: center; flex-direction: column; gap: 14px; }
+    .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading p { font-family: var(--mono); color: var(--muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="logo">AO<span>.</span>TRACKER <span style="font-size:11px;color:var(--muted);font-weight:500;font-family:var(--mono);">INFOSOLUCES</span></div>
+  <div class="header-right">
+    <span class="badge-live"><span class="dot"></span> Surveillance active</span>
+    <button class="btn-ghost" onclick="openSearchModal()">+ Recherche manuelle</button>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Sidebar -->
+  <aside>
+    <div class="filter-group">
+      <div class="sidebar-title">Secteur</div>
+      <button class="filter-btn active" onclick="filterSector('all',this)">Tous <span class="count" id="cnt-all">{{ stats.total }}</span></button>
+      <button class="filter-btn" onclick="filterSector('Développement',this)">Développement <span class="count" id="cnt-dev">{{ stats.par_secteur.get('Développement',0) }}</span></button>
+      <button class="filter-btn" onclick="filterSector('Réseau',this)">Réseau <span class="count" id="cnt-res">{{ stats.par_secteur.get('Réseau',0) }}</span></button>
+      <button class="filter-btn" onclick="filterSector('Sécurité',this)">Sécurité <span class="count" id="cnt-sec">{{ stats.par_secteur.get('Sécurité',0) }}</span></button>
+      <button class="filter-btn" onclick="filterSector('Matériel',this)">Matériel <span class="count" id="cnt-mat">{{ stats.par_secteur.get('Matériel',0) }}</span></button>
+      <button class="filter-btn" onclick="filterSector('Maintenance',this)">Maintenance <span class="count" id="cnt-mnt">{{ stats.par_secteur.get('Maintenance',0) }}</span></button>
+    </div>
+
+    <div class="filter-group">
+      <div class="sidebar-title">Statut</div>
+      <button class="filter-btn" onclick="filterStatus('Nouveau',this)">Nouveau <span class="count">{{ stats.nouveaux }}</span></button>
+      <button class="filter-btn" onclick="filterStatus('Lu',this)">Lu</button>
+      <button class="filter-btn" onclick="filterStatus('Soumis',this)">Soumis</button>
+      <button class="filter-btn" onclick="filterStatus('Rejeté',this)">Rejeté</button>
+    </div>
+
+    <div class="filter-group">
+      <div class="sidebar-title">Score min</div>
+      <input type="range" id="score-filter" min="0" max="100" value="0" style="width:100%;accent-color:var(--accent)" oninput="filterScore(this.value)"/>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:6px">Score ≥ <span id="score-val">0</span></div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main>
+
+    <!-- KPIs -->
+    <div class="kpi-row">
+      <div class="kpi">
+        <div class="kpi-label">Total AO</div>
+        <div class="kpi-value" id="kpi-total">{{ stats.total }}</div>
+        <div class="kpi-sub">dans la base</div>
+      </div>
+      <div class="kpi green">
+        <div class="kpi-label">Nouveaux</div>
+        <div class="kpi-value" style="color:var(--green)" id="kpi-new">{{ stats.nouveaux }}</div>
+        <div class="kpi-sub">non lus</div>
+      </div>
+      <div class="kpi red">
+        <div class="kpi-label">Urgents</div>
+        <div class="kpi-value" style="color:var(--red)" id="kpi-urgent">{{ stats.urgents }}</div>
+        <div class="kpi-sub">deadline &lt; 7 jours</div>
+      </div>
+      <div class="kpi blue">
+        <div class="kpi-label">Score moyen</div>
+        <div class="kpi-value" style="color:var(--blue)" id="kpi-score">{{ stats.score_moyen }}</div>
+        <div class="kpi-sub">pertinence LLM</div>
+      </div>
+    </div>
+
+    <!-- Search bar -->
+    <div class="search-row">
+      <input class="search-input" type="text" id="search-input" placeholder="Filtrer par titre, description…" oninput="filterTable(this.value)"/>
+      <button class="btn-ghost" onclick="refreshTable()">↻ Rafraîchir</button>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <div class="table-header">
+        <span class="table-header-title">Appels d'offres <span id="result-count" style="color:var(--muted);font-weight:400;font-size:12px;font-family:var(--mono)"></span></span>
+        <button class="btn-ghost" style="font-size:11px;padding:5px 12px" onclick="exportCSV()">↓ Export CSV</button>
+      </div>
+      <table id="ao-table">
+        <thead>
+          <tr>
+            <th>Titre / Source</th>
+            <th>Secteur</th>
+            <th>Budget</th>
+            <th>Deadline</th>
+            <th>Score</th>
+            <th>Statut</th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          {% for ao in tenders %}
+          <tr data-sector="{{ ao.sector }}" data-status="{{ ao.status }}" data-score="{{ ao.score }}" data-title="{{ ao.title|lower }}" data-desc="{{ ao.description|lower }}">
+            <td class="td-title">
+              <a href="{{ ao.source_url or '#' }}" target="_blank" title="{{ ao.title }}">{{ ao.title }}</a>
+              <div class="td-source">{{ ao.source_url|truncate(50) if ao.source_url else '—' }}</div>
+            </td>
+            <td>
+              {% set sc = ao.sector|lower %}
+              <span class="sector {{ 'dev' if 'velop' in sc else 'reseau' if 'seau' in sc else 'securite' if 'curit' in sc else 'materiel' if 'teri' in sc else 'autre' }}">
+                {{ ao.sector }}
+              </span>
+            </td>
+            <td style="font-family:var(--mono);font-size:12px;color:var(--muted)">{{ ao.budget or '—' }}</td>
+            <td>
+              {% if ao.deadline %}
+                <span class="deadline {{ 'urgent' if ao.deadline < (now_plus_7 if now_plus_7 is defined else '2099') else 'ok' }}">{{ ao.deadline }}</span>
+              {% else %}
+                <span style="color:var(--muted);font-family:var(--mono);font-size:12px">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="score-wrap">
+                <div class="score-bar"><div class="score-fill {{ 'mid' if ao.score < 70 else '' }} {{ 'low' if ao.score < 40 else '' }}" style="width:{{ ao.score }}%"></div></div>
+                <span class="score-num">{{ ao.score }}</span>
+              </div>
+            </td>
+            <td>
+              <span class="status {{ ao.status|lower }}">{{ ao.status }}</span>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6"><div class="empty"><div class="empty-icon">📭</div><div class="empty-msg">Aucun appel d'offres trouvé.<br>Lance une recherche pour commencer.</div></div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- Loading overlay -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p id="loading-msg">Recherche en cours…</p>
+</div>
+
+<!-- Toast notification -->
+<div id="toast"></div>
+
+<script>
+  // ── Filtres ──────────────────────────────────────────────────────────────
+  let currentSector = 'all';
+  let currentStatus = 'all';
+  let currentScore  = 0;
+  let currentSearch = '';
+
+  function applyFilters() {
+    const rows = document.querySelectorAll('#table-body tr[data-sector]');
+    let visible = 0;
+    rows.forEach(row => {
+      const sector = row.dataset.sector;
+      const status = row.dataset.status;
+      const score  = parseInt(row.dataset.score) || 0;
+      const text   = (row.dataset.title + ' ' + row.dataset.desc);
+      const show = (currentSector === 'all' || sector === currentSector)
+                && (currentStatus === 'all' || status === currentStatus)
+                && (score >= currentScore)
+                && (currentSearch === '' || text.includes(currentSearch.toLowerCase()));
+      row.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    document.getElementById('result-count').textContent = `(${visible})`;
+  }
+
+  function filterSector(s, btn) {
+    currentSector = s;
+    document.querySelectorAll('.filter-btn').forEach(b => {
+      if (['all','Développement','Réseau','Sécurité','Matériel','Maintenance'].some(x => b.textContent.includes(x))) b.classList.remove('active');
+    });
+    btn.classList.add('active');
+    applyFilters();
+  }
+
+  function filterStatus(s, btn) {
+    currentStatus = currentStatus === s ? 'all' : s;
+    document.querySelectorAll('.filter-btn').forEach(b => {
+      if (['Nouveau','Lu','Soumis','Rejeté'].some(x => b.textContent.includes(x))) b.classList.remove('active');
+    });
+    if (currentStatus !== 'all') btn.classList.add('active');
+    applyFilters();
+  }
+
+  function filterScore(v) {
+    currentScore = parseInt(v);
+    document.getElementById('score-val').textContent = v;
+    applyFilters();
+  }
+
+  function filterTable(v) {
+    currentSearch = v.toLowerCase();
+    applyFilters();
+  }
+
+  // ── Recherche manuelle ───────────────────────────────────────────────────
+  function openSearchModal() {
+    const query = prompt('Requête de recherche :', "appel d'offres informatique Côte d'Ivoire 2025");
+    if (!query) return;
+    runSearch(query);
+  }
+
+  async function runSearch(query) {
+    showLoading(`Recherche : "${query}"…`);
+    try {
+      const resp = await fetch('/api/search', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({query})
+      });
+      const data = await resp.json();
+      hideLoading();
+      showToast(`✓ ${data.found} nouvel(s) AO trouvé(s)`);
+      setTimeout(() => location.reload(), 1500);
+    } catch(e) {
+      hideLoading();
+      showToast('✗ Erreur de recherche');
+    }
+  }
+
+  function refreshTable() { location.reload(); }
+
+  // ── Export CSV ───────────────────────────────────────────────────────────
+  function exportCSV() {
+    const rows = [...document.querySelectorAll('#table-body tr[data-sector]')]
+      .filter(r => r.style.display !== 'none');
+    const header = 'Titre,Secteur,Budget,Deadline,Score,Statut\n';
+    const lines = rows.map(r => {
+      const cells = r.querySelectorAll('td');
+      return [
+        '"' + (cells[0]?.querySelector('a')?.textContent?.trim().replace(/"/g,'""') || '') + '"',
+        '"' + (cells[1]?.textContent?.trim() || '') + '"',
+        '"' + (cells[2]?.textContent?.trim() || '') + '"',
+        '"' + (cells[3]?.textContent?.trim() || '') + '"',
+        cells[4]?.querySelector('.score-num')?.textContent?.trim() || '0',
+        '"' + (cells[5]?.textContent?.trim() || '') + '"',
+      ].join(',');
+    });
+    const csv = header + lines.join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+    a.download = 'ao_export_' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+  }
+
+  // ── UI helpers ───────────────────────────────────────────────────────────
+  function showLoading(msg) {
+    document.getElementById('loading-msg').textContent = msg || 'Chargement…';
+    document.getElementById('loading').style.display = 'flex';
+  }
+  function hideLoading() {
+    document.getElementById('loading').style.display = 'none';
+  }
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => { t.style.display = 'none'; }, 3000);
+  }
+
+  // Init
+  applyFilters();
+</script>
+</body>
+</html>
