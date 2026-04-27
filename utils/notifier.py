@@ -44,13 +44,15 @@ CAT4 — Vente matériel / Maintenance / Support
 
 Analyse cet appel d'offres et retourne UNIQUEMENT un JSON :
 {
-  "categories": ["CAT1", "CAT3"],   // liste des catégories applicables (1 à 4)
+  "categories": ["CAT1", "CAT3"],
   "raison": "explication courte"
 }
 
 AO à analyser :
 Titre       : {title}
 Secteur     : {sector}
+BU          : {bu}
+Type        : {type}
 Description : {description}
 """.strip()
 
@@ -67,6 +69,8 @@ def _classify_tender_llm(tender: dict) -> list[str]:
         prompt = CLASSIFY_PROMPT.format(
             title       = tender.get("title", ""),
             sector      = tender.get("sector", ""),
+            bu          = tender.get("bu", ""),
+            type        = tender.get("type", "ao"),
             description = tender.get("description", ""),
         )
         msg = client.messages.create(
@@ -92,6 +96,7 @@ def _classify_tender_fallback(tender: dict) -> list[str]:
     text = (
         tender.get("title","") + " " +
         tender.get("sector","") + " " +
+        tender.get("bu","") + " " +
         tender.get("description","")
     ).lower()
 
@@ -100,13 +105,97 @@ def _classify_tender_fallback(tender: dict) -> list[str]:
         if any(kw.lower() in text for kw in cat["keywords"]):
             matched.append(cat_id)
 
-    return matched if matched else ["CAT1", "CAT3"]  # défaut : dev + AO généraux
+    return matched if matched else ["CAT1", "CAT3"]
+
+
+# ── Helpers HTML ──────────────────────────────────────────────────────────────
+
+def _row(label: str, value: str, color: str = "#333") -> str:
+    """Génère une ligne de tableau si la valeur existe."""
+    if not value:
+        return ""
+    return f"""
+        <tr>
+          <td style="padding:5px 12px 5px 0;width:28%;color:#999;font-size:12px;">{label}</td>
+          <td style="padding:5px 0;font-weight:600;color:{color};font-size:12px;">{value}</td>
+        </tr>"""
+
+
+def _social_links(contact: dict) -> str:
+    """Génère les boutons réseaux sociaux si disponibles."""
+    links = []
+    socials = {
+        "linkedin":  ("LinkedIn",  "#0077b5"),
+        "twitter":   ("Twitter/X", "#1da1f2"),
+        "facebook":  ("Facebook",  "#1877f2"),
+        "site_web":  ("Site Web",  "#555555"),
+    }
+    for key, (label, color) in socials.items():
+        url = contact.get(key, "")
+        if url:
+            links.append(
+                f'<a href="{url}" style="display:inline-block;margin:3px 4px 3px 0;'
+                f'padding:4px 12px;background:{color};color:white;font-size:11px;'
+                f'border-radius:4px;text-decoration:none;">{label}</a>'
+            )
+    autres = contact.get("autres_reseaux", "")
+    if autres:
+        links.append(
+            f'<span style="font-size:11px;color:#888;vertical-align:middle;">{autres}</span>'
+        )
+    return "".join(links)
+
+
+def _contact_block(contact: dict) -> str:
+    """Génère le bloc HTML complet du contact."""
+    if not contact or not any(contact.values()):
+        return ""
+
+    org          = contact.get("organisation", "")
+    responsable  = contact.get("responsable", "")
+    poste        = contact.get("poste", "")
+    telephone    = contact.get("telephone", "")
+    email        = contact.get("email", "")
+    adresse      = contact.get("adresse", "")
+    social_html  = _social_links(contact)
+
+    rows = ""
+    if org:
+        rows += _row("Structure",     org)
+    if responsable:
+        rows += _row("Responsable",   f"👤 {responsable}", "#0d0f14")
+    if poste:
+        rows += _row("Poste",         poste)
+    if telephone:
+        rows += _row("Téléphone",     f"📞 {telephone}", "#27ae60")
+    if email:
+        rows += _row("Email",         f'<a href="mailto:{email}" style="color:#f0a500;">{email}</a>')
+    if adresse:
+        rows += _row("Adresse",       f"📍 {adresse}")
+
+    if not rows and not social_html:
+        return ""
+
+    return f"""
+    <!-- Bloc Contact -->
+    <div style="background:#f0f4ff;border-radius:8px;padding:16px 18px;
+                margin-bottom:18px;border-left:4px solid #6b9fff;">
+      <p style="font-size:12px;font-weight:bold;color:#0d0f14;margin:0 0 10px;">
+        📋 Contact &amp; Responsable
+      </p>
+      <table style="width:100%;border-collapse:collapse;">
+        {rows}
+      </table>
+      {"<div style='margin-top:10px;'>" + social_html + "</div>" if social_html else ""}
+    </div>
+    """
 
 
 # ── Construction email ────────────────────────────────────────────────────────
 
 def _build_email_html(recipient_name: str, tender: dict,
                       category: dict, urgent: bool = False) -> str:
+
     urgence = f"""
       <div style="background:#fff3cd;border-left:4px solid #e74c3c;padding:10px 14px;
                   margin-bottom:16px;font-size:13px;border-radius:4px;">
@@ -116,15 +205,51 @@ def _build_email_html(recipient_name: str, tender: dict,
 
     deadline_style = "color:#e74c3c;font-weight:bold" if urgent else "color:#444"
 
+    # Nouveaux champs
+    contact        = tender.get("contact", {}) or {}
+    bu             = tender.get("bu", "")
+    type_result    = tender.get("type", "ao")
+    localisation   = tender.get("localisation", "")
+    budget         = tender.get("budget", "") or "—"
+    budget_devise  = tender.get("budget_devise", "")
+    budget_display = f"{budget} {budget_devise}".strip() if budget != "—" else "—"
+    doc_summary    = tender.get("document_summary", "")
+    pertinent      = tender.get("pertinent_infosoluces", True)
+
+    # Badge type
+    type_colors = {
+        "ao":            ("#f0a500", "📋 Appel d'offres"),
+        "entreprise":    ("#27ae60", "🏢 Nouvelle entreprise"),
+        "salon":         ("#8e44ad", "🎪 Salon / Événement"),
+        "certification": ("#2980b9", "🏆 Certification"),
+        "ia":            ("#e74c3c", "🤖 Intelligence Artificielle"),
+        "formation":     ("#16a085", "🎓 Formation"),
+        "microsoft":     ("#0078d4", "☁️ Microsoft"),
+        "autre":         ("#95a5a6", "📌 Veille"),
+    }
+    type_color, type_label = type_colors.get(type_result, ("#95a5a6", "📌 Autre"))
+
+    # Résumé document
+    doc_block = f"""
+    <div style="background:#fffdf0;border-left:4px solid #f39c12;padding:12px 16px;
+                border-radius:6px;margin-bottom:18px;font-size:12px;color:#7d6608;">
+      <strong>📄 Résumé document :</strong><br>{doc_summary}
+    </div>
+    """ if doc_summary else ""
+
+    # Contact block
+    contact_html = _contact_block(contact)
+
     return f"""
-<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;border-radius:8px;overflow:hidden;border:1px solid #e8e8e8;">
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;
+            border-radius:8px;overflow:hidden;border:1px solid #e8e8e8;">
 
   <!-- Header -->
-  <div style="background:#0d0f14;padding:18px 28px;display:flex;align-items:center;">
+  <div style="background:#0d0f14;padding:18px 28px;">
     <span style="color:#f0a500;font-size:20px;font-weight:bold;">AO·TRACKER</span>
     <span style="color:#6b7090;font-size:12px;margin-left:10px;">INFOSOLUCES SARL</span>
-    <span style="margin-left:auto;background:#1a1e2a;color:#6b9fff;font-size:11px;
-                 padding:3px 10px;border-radius:12px;">{category['label']}</span>
+    <span style="float:right;background:{type_color};color:white;font-size:11px;
+                 padding:3px 10px;border-radius:12px;">{type_label}</span>
   </div>
 
   <!-- Corps -->
@@ -133,14 +258,15 @@ def _build_email_html(recipient_name: str, tender: dict,
       Bonjour <strong>{recipient_name}</strong>,
     </p>
     <p style="color:#666;font-size:13px;margin:0 0 20px;">
-      Un nouvel appel d'offres correspond à votre domaine
-      (<strong>{tender.get('sector','')}</strong>).
+      Un nouveau résultat correspond à votre domaine
+      <strong>{category['label']}</strong>
+      {"— <span style='color:#27ae60;font-size:12px;'>✅ Pertinent INFOSOLUCES</span>" if pertinent else ""}.
     </p>
 
     {urgence}
 
-    <!-- Carte AO -->
-    <div style="background:#f7f8fc;border-radius:8px;padding:18px;margin-bottom:20px;
+    <!-- Carte principale -->
+    <div style="background:#f7f8fc;border-radius:8px;padding:18px;margin-bottom:18px;
                 border-left:4px solid #f0a500;">
       <h2 style="font-size:15px;color:#0d0f14;margin:0 0 10px;line-height:1.4;">
         {tender.get('title','')}
@@ -148,34 +274,34 @@ def _build_email_html(recipient_name: str, tender: dict,
       <p style="font-size:13px;color:#555;margin:0 0 14px;line-height:1.6;">
         {tender.get('description','')}
       </p>
-      <table style="width:100%;font-size:12px;color:#666;border-collapse:collapse;">
-        <tr>
-          <td style="padding:5px 12px 5px 0;width:25%;color:#999;">Secteur</td>
-          <td style="padding:5px 0;font-weight:600;color:#333;">{tender.get('sector','—')}</td>
-          <td style="padding:5px 12px 5px 20px;width:20%;color:#999;">Score</td>
-          <td style="padding:5px 0;color:#f0a500;font-weight:bold;">{tender.get('score',0)}/100</td>
-        </tr>
-        <tr>
-          <td style="padding:5px 12px 5px 0;color:#999;">Budget</td>
-          <td style="padding:5px 0;font-weight:600;color:#333;">{tender.get('budget','—') or '—'}</td>
-          <td style="padding:5px 12px 5px 20px;color:#999;">Deadline</td>
-          <td style="padding:5px 0;{deadline_style};">{tender.get('deadline','—') or '—'}</td>
-        </tr>
+      <table style="width:100%;border-collapse:collapse;">
+        {_row("Secteur",      tender.get('sector','—'))}
+        {_row("BU",           bu)}
+        {_row("Localisation", localisation)}
+        {_row("Budget",       budget_display, "#27ae60")}
+        {_row("Deadline",     tender.get('deadline','—') or '—',
+                              "#e74c3c" if urgent else "#444")}
+        {_row("Score",        f"{tender.get('score',0)}/100 — {tender.get('score_reason','')}", "#f0a500")}
       </table>
     </div>
+
+    {doc_block}
+    {contact_html}
 
     <a href="{tender.get('source_url','#')}"
        style="display:inline-block;background:#f0a500;color:#0d0f14;padding:11px 24px;
               border-radius:6px;font-size:13px;font-weight:bold;text-decoration:none;">
-      Voir l'appel d'offres →
+      Voir la source →
     </a>
   </div>
 
   <!-- Footer -->
-  <div style="padding:12px 28px;background:#f4f6fb;font-size:11px;color:#aaa;text-align:center;">
+  <div style="padding:12px 28px;background:#f4f6fb;font-size:11px;
+              color:#aaa;text-align:center;">
     AO Tracker · INFOSOLUCES SARL · Abidjan, Côte d'Ivoire &nbsp;|&nbsp;
     {datetime.utcnow().strftime('%d/%m/%Y à %H:%M')} UTC
   </div>
+
 </div>
 """
 
@@ -207,9 +333,9 @@ def _send_email(to: str, subject: str, html: str) -> bool:
 
 def notify_new_tenders(tenders: list[dict]) -> dict:
     """
-    Pour chaque AO :
+    Pour chaque résultat (AO, entreprise, salon, certification, etc.) :
     1. LLM détermine les catégories (CAT1..CAT4)
-    2. Collecte les destinataires uniques des catégories matchées
+    2. Collecte les destinataires uniques
     3. Envoie un email à chacun (anti-doublon par tender_id)
     """
     today     = datetime.utcnow().strftime("%Y-%m-%d")
@@ -221,7 +347,7 @@ def notify_new_tenders(tenders: list[dict]) -> dict:
         deadline  = tender.get("deadline", "")
         urgent    = bool(deadline and today <= deadline <= in_7_days)
 
-        print(f"\n  [NOTIF] AO : {tender.get('title','')[:50]}")
+        print(f"\n  [NOTIF] [{tender.get('type','ao').upper()}] {tender.get('title','')[:50]}")
 
         # 1. Classification LLM
         cat_ids = _classify_tender_llm(tender)
@@ -229,8 +355,8 @@ def notify_new_tenders(tenders: list[dict]) -> dict:
             print(f"  [NOTIF] Aucune catégorie matchée — ignoré")
             continue
 
-        # 2. Collecter destinataires uniques toutes catégories confondues
-        recipients = {}  # email → (name, category)
+        # 2. Collecter destinataires uniques
+        recipients = {}
         for cat_id in cat_ids:
             cat = CATEGORIES[cat_id]
             for email in cat["emails"]:
@@ -242,15 +368,26 @@ def notify_new_tenders(tenders: list[dict]) -> dict:
 
         # 3. Envoi
         for email, info in recipients.items():
-            # Anti-doublon : clé = email + tender_id
             notif_key = f"{email}_{tender_id}"
             if was_notified(notif_key, tender_id):
                 print(f"    ⟳ Déjà notifié : {email}")
                 continue
 
+            # Sujet selon le type
+            type_result = tender.get("type", "ao")
+            prefixes = {
+                "ao":            "📋 AO",
+                "entreprise":    "🏢 Entreprise",
+                "salon":         "🎪 Salon",
+                "certification": "🏆 Certif",
+                "ia":            "🤖 IA",
+                "formation":     "🎓 Formation",
+                "microsoft":     "☁️ Microsoft",
+            }
+            prefix = prefixes.get(type_result, "📌 Veille")
             subject = (
                 f"{'🚨 URGENT — ' if urgent else ''}"
-                f"[{info['category']['label']}] "
+                f"[{prefix}] "
                 f"{tender.get('title','')[:45]}"
             )
             html = _build_email_html(info["name"], tender, info["category"], urgent)
