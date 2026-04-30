@@ -2,7 +2,7 @@ from flask import Flask, render_template, jsonify, request
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask_cors import CORS
 from scrapers.web_search import search_tenders
-from models.database import init_db, get_all_tenders, get_stats
+from models.database import init_db, get_all_tenders, get_stats , update_status
 from models.users    import init_users, get_all_users
 from utils.notifier  import notify_new_tenders, notify_urgent_tenders
 import atexit
