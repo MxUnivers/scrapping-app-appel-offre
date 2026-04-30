@@ -1,3 +1,7 @@
+# Deployer on vps 
+podman build -t scrapp-infosoluces .
+ systemctl restart container-scrapp-infosoluces
+
 # AO Tracker — INFOSOLUCES SARL
 
 Système de surveillance automatique des appels d'offres IT (Réseau, Développement, Sécurité, Matériel).

@@ -106,19 +106,64 @@ def _serialize(doc: dict) -> dict:
     return doc
 
 
-def get_all_tenders(sector: str = "all", status: str = "all") -> list[dict]:
-    """AO filtrés, triés score DESC puis date DESC."""
-    query = {}
+def get_all_tenders(sector: str = "all", status: str = "all", page: int = None, per_page: int = None) -> dict | list:
+    """
+    Si page et per_page sont fournis → retourne un dict paginé avec:
+        - items
+        - total
+        - page, per_page, pages
+        - status_counts (dictionnaire des nombres par statut pour le filtre sector uniquement)
+    Sinon (appel depuis le dashboard ou ancienne route) → retourne la liste complète.
+    """
+    # Construction de la requête pour les items (avec filtre status)
+    query_items = {}
     if sector != "all":
-        query["sector"] = sector
+        query_items["sector"] = sector
     if status != "all":
-        query["status"] = status
+        query_items["status"] = status
 
-    cursor = get_db()["tenders"].find(query).sort(
-        [("score", DESCENDING), ("created_at", DESCENDING)]
-    )
-    return [_serialize(doc) for doc in cursor]
+    # Requête pour les comptes par statut (sans filtre status, pour avoir la répartition globale)
+    query_counts = {}
+    if sector != "all":
+        query_counts["sector"] = sector
+    # Ne pas inclure le filtre status
 
+    col = get_db()["tenders"]
+    sort_criteria = [("score", DESCENDING), ("created_at", DESCENDING)]
+
+    # Comportement historique (pas de pagination)
+    if page is None or per_page is None:
+        cursor = col.find(query_items).sort(sort_criteria)
+        return [_serialize(doc) for doc in cursor]
+
+    # Pagination active
+    total = col.count_documents(query_items)
+    skip = max(0, (page - 1) * per_page)
+    cursor = col.find(query_items).sort(sort_criteria).skip(skip).limit(per_page)
+    items = [_serialize(doc) for doc in cursor]
+    pages = (total + per_page - 1) // per_page if total > 0 else 0
+
+    # Obtenir les comptes par statut
+    pipeline = [
+        {"$match": query_counts},
+        {"$group": {"_id": "$status", "count": {"$sum": 1}}}
+    ]
+    status_counts_raw = list(col.aggregate(pipeline))
+    status_counts = {item["_id"]: item["count"] for item in status_counts_raw if item["_id"]}
+    # S'assurer que tous les statuts sont présents (avec 0 si absent)
+    all_statuses = ["Nouveau", "Lu", "Soumis", "Rejeté", "Traité"]
+    for s in all_statuses:
+        if s not in status_counts:
+            status_counts[s] = 0
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": pages,
+        "status_counts": status_counts
+    }
 
 def get_tender_by_id(tender_id: str) -> dict | None:
     from bson import ObjectId

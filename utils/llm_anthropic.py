@@ -1,75 +1,20 @@
 """
-utils/llm.py — Analyse AO + Veille IT avec DeepSeek API
+utils/llm.py — Analyse AO + Veille IT avec Claude API
 """
-import os, json, re, requests
+import os, json, re
 from datetime import datetime
+import anthropic
 
 CURRENT_YEAR  = datetime.now().year
 CURRENT_MONTH = datetime.now().strftime("%B %Y")
 
-DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions"
-DEEPSEEK_MODEL   = "deepseek-chat"   # ou "deepseek-reasoner" pour plus de précision
+def _get_client():
+    key = os.getenv("ANTHROPIC_API_KEY")
+    return anthropic.Anthropic(api_key=key) if key else None
 
-
-
-
-
-def _get_headers():
-    key = os.getenv("DEEPSEEK_API_KEY")
-    if not key:
-        raise RuntimeError("DEEPSEEK_API_KEY non définie dans .env")
-    return {
-        "Authorization": f"Bearer {key}",
-        "Content-Type":  "application/json",
-    }
-
-
-def _call_deepseek(system: str, user: str, max_tokens: int = 800) -> str:
-    """Appel générique à l'API DeepSeek — retourne le texte brut."""
-    payload = {
-        "model":      DEEPSEEK_MODEL,
-        "max_tokens": max_tokens,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user",   "content": user},
-        ],
-    }
-    resp = requests.post(
-        DEEPSEEK_API_URL,
-        headers=_get_headers(),
-        json=payload,
-        timeout=60,
-    )
-    resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"].strip()
-
-
-def _parse_json(raw: str) -> dict:
-    """Nettoie et parse le JSON retourné par le LLM."""
-    raw = re.sub(r"^```json\s*", "", raw)
-    raw = re.sub(r"```\s*$",     "", raw).strip()
-
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError:
-        m = re.search(r"\{.*\}", raw, re.DOTALL)
-        if m:
-            try:
-                parsed = json.loads(m.group())
-            except Exception:
-                parsed = None
-        else:
-            parsed = None
-
-    if parsed is None:
-        raise ValueError(f"JSON invalide reçu: {raw[:150]}")
-    if isinstance(parsed, list):
-        parsed = parsed[0] if parsed else {}
-    if not isinstance(parsed, dict):
-        raise ValueError(f"Type inattendu: {type(parsed)}")
-    return parsed
-
-
+# =========================================================
+# SYSTEM PROMPT — Expert AO + Veille IT Côte d'Ivoire
+# =========================================================
 SYSTEM_PROMPT = f"""
 Tu es un expert en marchés publics, appels d'offres IT et veille technologique
 en Afrique de l'Ouest, spécialisé Côte d'Ivoire.
@@ -81,7 +26,7 @@ infogérance, électricité industrielle).
 Nous sommes en {CURRENT_MONTH}. L'année en cours est {CURRENT_YEAR}.
 
 Règles importantes :
-- Tu te concentres UNIQUEMENT sur la Côte d'Ivoire .
+- Tu te concentres UNIQUEMENT sur la Côte d'Ivoire et l'Afrique de l'Ouest.
 - Un AO est "actif" si sa deadline est après aujourd'hui ou inconnue.
 - Un AO est "expiré" si sa deadline est clairement passée.
 - Tu extrais le BUDGET si mentionné (en FCFA, EUR, USD ou toute devise).
@@ -94,7 +39,9 @@ Règles importantes :
 Tu réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ou après.
 """.strip()
 
-
+# =========================================================
+# PROMPT PRINCIPAL — AO + Veille
+# =========================================================
 def _build_prompt(title: str, url: str, raw_text: str) -> str:
     today = datetime.now().strftime("%Y-%m-%d")
     return f"""
@@ -150,13 +97,60 @@ Texte  :
 Réponds UNIQUEMENT avec l'objet JSON.
 """.strip()
 
-
+# =========================================================
+# ANALYSE PRINCIPALE
+# =========================================================
 def analyze_tender(title: str, url: str, raw_text: str) -> dict:
-    raw = _call_deepseek(SYSTEM_PROMPT, _build_prompt(title, url, raw_text), max_tokens=800)
-    return _parse_json(raw)
+    client = _get_client()
+    if not client:
+        raise RuntimeError("ANTHROPIC_API_KEY non définie dans .env")
+
+    msg = client.messages.create(
+        model      = "claude-haiku-4-5-20251001",
+        max_tokens = 800,
+        system     = SYSTEM_PROMPT,
+        messages   = [{"role": "user", "content": _build_prompt(title, url, raw_text)}],
+    )
+
+    raw = msg.content[0].text.strip()
+    raw = re.sub(r"^```json\s*", "", raw)
+    raw = re.sub(r"```\s*$",     "", raw).strip()
+
+    parsed = None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        m = re.search(r"\{.*\}", raw, re.DOTALL)
+        if m:
+            try:
+                parsed = json.loads(m.group())
+            except Exception:
+                pass
+
+    if parsed is None:
+        raise ValueError(f"JSON invalide: {raw[:150]}")
+
+    if isinstance(parsed, list):
+        parsed = parsed[0] if parsed else {}
+
+    if not isinstance(parsed, dict):
+        raise ValueError(f"Type inattendu: {type(parsed)}")
+
+    return parsed
 
 
+# =========================================================
+# LECTURE DE DOCUMENTS (PDF / Word)
+# =========================================================
 def analyze_document(title: str, url: str, doc_text: str) -> dict:
+    """
+    Analyse un document PDF ou Word extrait en texte.
+    Retourne les mêmes champs que analyze_tender + document_summary complet.
+    """
+    client = _get_client()
+    if not client:
+        raise RuntimeError("ANTHROPIC_API_KEY non définie dans .env")
+
     prompt = f"""
 Tu as reçu le contenu d'un document (PDF ou Word) lié à un appel d'offres
 ou une information de veille en Côte d'Ivoire.
@@ -172,7 +166,7 @@ Retourne UN SEUL objet JSON :
   "deadline": "YYYY-MM-DD si trouvée, sinon vide",
   "localisation": "Abidjan / Côte d'Ivoire / autre",
   "description": "Résumé détaillé du document en 4-5 phrases",
-  "document_summary": "Points clés : exigences techniques, critères, livrables",
+  "document_summary": "Points clés du document : exigences techniques, critères, livrables",
   "requirements": ["liste", "des", "exigences", "principales"],
 
   "contact": {{
@@ -203,5 +197,24 @@ Document :
 Réponds UNIQUEMENT avec l'objet JSON.
 """.strip()
 
-    raw = _call_deepseek(SYSTEM_PROMPT, prompt, max_tokens=1000)
-    return _parse_json(raw)
+    msg = client.messages.create(
+        model      = "claude-haiku-4-5-20251001",
+        max_tokens = 1000,
+        system     = SYSTEM_PROMPT,
+        messages   = [{"role": "user", "content": prompt}],
+    )
+
+    raw = msg.content[0].text.strip()
+    raw = re.sub(r"^```json\s*", "", raw)
+    raw = re.sub(r"```\s*$",     "", raw).strip()
+
+    try:
+        return json.loads(raw)
+    except Exception:
+        m = re.search(r"\{.*\}", raw, re.DOTALL)
+        if m:
+            try:
+                return json.loads(m.group())
+            except Exception:
+                pass
+    return {"error": "parsing_failed", "raw": raw[:200]}

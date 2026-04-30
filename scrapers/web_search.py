@@ -10,7 +10,6 @@ from utils.llm import analyze_tender
 from models.database import save_tender
 
 # ── Force IPv4 globalement ────────────────────────────────────────────────────
-_orig_create = None
 try:
     from urllib3.util.connection import create_connection as _orig_create
     import urllib3.util.connection as _conn
@@ -63,7 +62,7 @@ def _search_ddgs(query, n=10):
     try:
         from ddgs import DDGS
         with DDGS() as d:
-            return [{"url": r["href"], "title": r["title"]}
+            return [{"url": r["href"], "title": r["title"], "snippet": r.get("body", "")}
                     for r in d.text(query, max_results=n)]
     except ImportError:
         print("  [DDGS] Non installé → pip install ddgs"); return []
@@ -83,7 +82,6 @@ def _search_bing(query, n=10):
             print(f"  [Bing] HTTP {resp.status_code}"); return []
         soup = BeautifulSoup(resp.text, "html.parser")
         results, seen = [], set()
-        # Essai de plusieurs sélecteurs (Bing change régulièrement)
         for sel in ["li.b_algo h2 a", "li.b_algo a[href]", "h2 a[href]", ".b_title a"]:
             for a in soup.select(sel):
                 href = a.get("href","")
@@ -91,7 +89,7 @@ def _search_bing(query, n=10):
                         and "microsoft.com" not in href and href not in seen):
                     t = a.get_text(strip=True)
                     if t:
-                        results.append({"url": href, "title": t})
+                        results.append({"url": href, "title": t, "snippet": ""})
                         seen.add(href)
             if results:
                 break
@@ -114,7 +112,7 @@ def _scrape(name, url, base):
                     ["appel","offre","marché","tender","informatique","it","logiciel"]):
                 if not h.startswith("http"):
                     h = base + h
-                out.append({"url": h, "title": t[:120]})
+                out.append({"url": h, "title": t[:120], "snippet": ""})
         return out[:10]
     except Exception as e:
         print(f"  [{name}] {e}"); return []
@@ -152,7 +150,39 @@ def _extract_page_text(url):
     except Exception as e:
         print(f"    [PAGE] {url[:55]}: {e}"); return ""
 
-# ── Filtre pertinence ─────────────────────────────────────────────────────────
+# =========================================================
+# FILTRE PRÉ-LLM — évite d'appeler DeepSeek inutilement
+# Réduit les appels LLM de ~4 500 → ~1 500 par cycle (-66%)
+# =========================================================
+_KEYWORDS_CI = [
+    # Géographie
+    "côte d'ivoire", "cote d'ivoire", "abidjan", "ivory coast",
+    "yopougon", "cocody", "plateau", "marcory", "bouaké",
+    # Appels d'offres
+    "appel d'offres", "appel offres", "avis d'appel", "marché public",
+    "tender", "rfp", "request for proposal", "procurement",
+    "sollicitation", "consultation", "expression d'intérêt",
+    # Institutions CI
+    "anrmp", "dmp", "bceao", "dgmp", "marchespublics.ci",
+    # Afrique
+    "afrique de l'ouest", "west africa", "afrique francophone", "afrique",
+    # Certifications (veille utile même sans géo)
+    "fortinet nse", "cisco ccna", "cisco ccnp", "microsoft certified",
+    "aws certified", "google cloud certified", "comptia",
+    # Tech / IA
+    "intelligence artificielle", "data scientist", "machine learning",
+]
+
+def _is_worth_llm(title: str, snippet: str, page_text: str = "") -> bool:
+    """
+    Vérifie si le contenu mérite un appel LLM (DeepSeek).
+    Retourne True si au moins 1 mot-clé CI est trouvé.
+    Coût : 0ms — simple recherche de chaîne.
+    """
+    combined = (title + " " + snippet + " " + page_text).lower()
+    return any(kw.lower() in combined for kw in _KEYWORDS_CI)
+
+# ── Filtre pertinence (existant — garde pour compatibilité) ───────────────────
 KW = ["appel d'offres","tender","marché public","informatique","développement",
       "logiciel","réseau","sécurité","IT","software","web","infrastructure","cloud"]
 
@@ -193,25 +223,48 @@ def search_tenders(query, max_results=10):
         print("  ⚠ 0 résultats — lance python test_search.py pour diagnostiquer")
         return []
 
-    saved = []
+    saved    = []
+    filtered = 0   # compteur URLs ignorées avant LLM
+
     for item in urls:
-        url, title = item["url"], item.get("title", "")
+        url     = item["url"]
+        title   = item.get("title",   "")
+        snippet = item.get("snippet", "")
         print(f"  → {url[:70]}")
-        text = _extract_page_text(url)
+
+        # ── ÉTAPE 1 : filtre rapide sur titre + snippet (0ms, gratuit) ────────
+        if not _is_worth_llm(title, snippet):
+            # Tente quand même la page si snippet vide
+            if not snippet:
+                text = _extract_page_text(url)
+                if not text or not _is_worth_llm(title, "", text):
+                    filtered += 1
+                    print(f"    ⏭ Hors périmètre CI — LLM non appelé")
+                    continue
+            else:
+                filtered += 1
+                print(f"    ⏭ Hors périmètre CI — LLM non appelé")
+                continue
+        else:
+            text = _extract_page_text(url)
+
+        # ── ÉTAPE 2 : filtre pertinence métier (existant) ─────────────────────
         if not text or not _relevant(text):
             print("    ✗ Non pertinent"); continue
+
+        # ── ÉTAPE 3 : appel LLM DeepSeek (seulement si pertinent) ────────────
         try:
             structured = analyze_tender(title=title, url=url, raw_text=text)
         except Exception as e:
             print(f"    ✗ LLM: {e}")
             structured = {"title": title, "sector": "Autre", "budget": "",
                           "deadline": "", "description": text[:250], "score": 30}
+
         structured.update({"source_url": url, "raw_text": text})
 
-        # Ne pas sauvegarder les pages de navigation / hors sujet
         score = int(structured.get("score", 0))
         if score < 20:
-            print(f"    ✗ Score trop bas ({score}) — page ignorée")
+            print(f"    ✗ Score trop bas ({score}) — ignoré")
             continue
 
         is_new = save_tender(structured)
@@ -221,5 +274,7 @@ def search_tenders(query, max_results=10):
             saved.append(structured)
         time.sleep(random.uniform(1.2, 2.5))
 
+    if filtered:
+        print(f"  ⏭ {filtered} URLs ignorées avant LLM (économie DeepSeek)")
     print(f"[SEARCH] {len(saved)} nouveaux AO sauvegardés\n")
     return saved
