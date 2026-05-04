@@ -3,10 +3,18 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from flask_cors import CORS
 from scrapers.web_search import search_tenders
 from models.database import init_db, get_all_tenders, get_stats , update_status
-from models.users    import init_users, get_all_users
-from utils.notifier  import notify_new_tenders, notify_urgent_tenders
+from models.users         import init_users, get_all_users
+from utils.notifier       import notify_new_tenders, notify_urgent_tenders
+from models.prospect_data import (
+    init_prospects, create_prospect, get_prospects, get_prospect,
+    get_prospect_stats, get_prospects_to_send, get_prospects_for_follow_up,
+    update_prospect_status, mark_prospect_sent, log_prospect_action,
+    PROSPECT_STATUS, get_campaigns, create_campaign,
+)
+from utils.llm_prospect   import generate_prospect_email, score_prospect_quality
 import atexit
 import os
+import random
 
 app = Flask(__name__)
 CORS(app)
@@ -162,6 +170,393 @@ def api_test_email():
         "envoyes": len([v for v in sent_to.values() if v["sent"]]),
         "details": sent_to,
     })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  PROSPECTION EMAIL AUTOMATISÉE — Routes API
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.route("/api/prospects")
+def api_prospects():
+    """Liste paginée des prospects."""
+    try:
+        status   = request.args.get("status", "all")
+        campaign = request.args.get("campaign", "all")
+        sector   = request.args.get("sector", "all")
+        page     = request.args.get("page", 1, type=int)
+        limit    = request.args.get("limit", 50, type=int)
+        data = get_prospects(status=status, campaign=campaign, sector=sector, page=page, limit=limit)
+        return jsonify(data)
+    except Exception as e:
+        print(f"[ERREUR] /api/prospects : {e}")
+        return jsonify({"error": "Erreur récupération prospects"}), 500
+
+
+@app.route("/api/prospects/stats")
+def api_prospects_stats():
+    """Statistiques de prospection."""
+    return jsonify(get_prospect_stats())
+
+
+@app.route("/api/prospects/generate", methods=["POST"])
+def api_generate_prospects():
+    """
+    Génère des emails de prospection à partir des AO récents.
+    Corps : {"limit": 5, "test_email": "optionnel@email.com"}
+    """
+    try:
+        data = request.get_json() or {}
+        limit     = data.get("limit", 5)
+        test_mode = bool(data.get("test_email"))
+        test_email = data.get("test_email", "")
+
+        # Récupérer les derniers AO avec contacts
+        tenders = get_all_tenders()
+        # Filtrer ceux qui ont un contact email
+        candidates = [
+            t for t in tenders
+            if t.get("contact") and t["contact"].get("email")
+            and t["contact"].get("organisation")
+        ]
+        # Trier par score décroissant
+        candidates.sort(key=lambda t: t.get("score", 0), reverse=True)
+        candidates = candidates[:limit]
+
+        if not candidates:
+            return jsonify({"status": "ok", "generated": 0,
+                            "message": "Aucun AO avec contact email trouvé"})
+
+        generated = []
+        for tender in candidates:
+            # Vérifier qualité du prospect
+            quality = score_prospect_quality(tender)
+            if quality < 30:
+                print(f"  [PROSPECT] Qualité insuffisante ({quality}) — ignoré: {tender.get('title','')[:40]}")
+                continue
+
+            # Vérifier si déjà prospecté
+            contact = tender.get("contact", {})
+            existing = create_prospect(
+                company_name     = contact.get("organisation", "Inconnue"),
+                contact_email    = test_email or contact.get("email", ""),
+                contact_name     = contact.get("responsable", ""),
+                contact_phone    = contact.get("telephone", ""),
+                source_tender_id = tender.get("id", ""),
+                source_url       = tender.get("source_url", ""),
+                sector           = tender.get("sector", ""),
+                score            = quality,
+            )
+            if not existing:
+                print(f"  [PROSPECT] Déjà existant (doublon): {contact.get('organisation','')[:30]}")
+                continue
+
+            # Générer l'email via DeepSeek
+            try:
+                email = generate_prospect_email(tender)
+            except Exception as e:
+                print(f"  [PROSPECT] Échec génération email: {e}")
+                continue
+
+            # Mettre à jour le prospect avec l'email généré
+            update_prospect_status(existing, "DRAFT",
+                subject=email.get("subject", ""),
+                body_html=email.get("body_html", ""),
+                body_text=email.get("body_text", ""),
+                call_to_action=email.get("call_to_action", ""),
+                confidence=email.get("confidence", 0),
+            )
+            generated.append({
+                "id":             existing,
+                "company":        contact.get("organisation", ""),
+                "email":          test_email or contact.get("email", ""),
+                "subject":        email.get("subject", ""),
+                "confidence":     email.get("confidence", 0),
+                "call_to_action": email.get("call_to_action", ""),
+            })
+            print(f"  [PROSPECT] ✓ {contact.get('organisation','')[:30]} → {email.get('subject','')[:50]}")
+
+        return jsonify({
+            "status":    "ok",
+            "generated": len(generated),
+            "candidates": len(candidates),
+            "prospects":  generated,
+            "test_mode":  test_mode,
+            "test_email": test_email or None,
+        })
+    except Exception as e:
+        print(f"[ERREUR] /api/prospects/generate : {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/prospects/send", methods=["POST"])
+def api_send_prospects():
+    """
+    Envoie les emails de prospection en attente (DRAFT).
+    Corps : {"limit": 5, "test_mode": true}
+    """
+    try:
+        data      = request.get_json() or {}
+        limit     = data.get("limit", 5)
+        test_mode = data.get("test_mode", False)
+        test_email = data.get("test_email", "")
+
+        drafts = get_prospects_to_send(limit=limit)
+        if not drafts:
+            return jsonify({"status": "ok", "sent": 0,
+                            "message": "Aucun prospect en attente"})
+
+        from utils.notifier import _send_email
+
+        sent = []
+        for prospect in drafts:
+            to_email = test_email or prospect["contact_email"]
+            subject  = prospect.get("subject", "") or ""
+            body_html = prospect.get("body_html", "") or ""
+
+            if not subject or not body_html:
+                print(f"  [SEND] Contenu vide — ignore {prospect.get('company_name','')[:30]}")
+                continue
+
+            ok = _send_email(to_email, subject, body_html)
+            if ok:
+                mark_prospect_sent(prospect["id"])
+                log_prospect_action(prospect["id"], "SENT", f"Envoyé à {to_email}")
+                sent.append({"id": prospect["id"], "to": to_email, "status": "SENT"})
+                print(f"  [SEND] ✓ {prospect.get('company_name','')[:30]} → {to_email}")
+            else:
+                update_prospect_status(prospect["id"], "BOUNCED")
+                log_prospect_action(prospect["id"], "BOUNCED", f"Échec envoi à {to_email}")
+                sent.append({"id": prospect["id"], "to": to_email, "status": "BOUNCED"})
+
+        return jsonify({
+            "status":     "ok",
+            "sent":       len([s for s in sent if s["status"] == "SENT"]),
+            "bounced":    len([s for s in sent if s["status"] == "BOUNCED"]),
+            "details":    sent,
+            "test_mode":  test_mode,
+        })
+    except Exception as e:
+        print(f"[ERREUR] /api/prospects/send : {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/prospects/follow-up", methods=["POST"])
+def api_follow_up():
+    """Génère et envoie des relances pour les prospects sans réponse."""
+    try:
+        data = request.get_json() or {}
+        limit = data.get("limit", 5)
+
+        from utils.llm_prospect import generate_follow_up_email
+        from utils.notifier    import _send_email
+
+        candidates = get_prospects_for_follow_up(days_since_last=7, limit=limit)
+        if not candidates:
+            return jsonify({"status": "ok", "follow_ups": 0,
+                            "message": "Aucun prospect à relancer"})
+
+        sent = []
+        for prospect in candidates:
+            previous = {
+                "subject":  prospect.get("subject", ""),
+                "body_text": prospect.get("body_text", ""),
+            }
+            try:
+                email = generate_follow_up_email(prospect, previous)
+            except Exception as e:
+                print(f"  [FOLLOW-UP] Échec génération: {e}")
+                continue
+
+            ok = _send_email(prospect["contact_email"], email["subject"], email["body_html"])
+            if ok:
+                follow_count = (prospect.get("follow_up_count") or 0) + 1
+                update_prospect_status(prospect["id"], "FOLLOW_UP",
+                    follow_up_count=follow_count,
+                    subject=email.get("subject", ""),
+                    body_html=email.get("body_html", ""),
+                    body_text=email.get("body_text", ""),
+                )
+                log_prospect_action(prospect["id"], "FOLLOW_UP",
+                    f"Relance #{follow_count}: {email.get('subject','')}")
+                sent.append({"id": prospect["id"], "to": prospect["contact_email"]})
+                print(f"  [FOLLOW-UP] ✓ {prospect.get('company_name','')[:30]} relance #{follow_count}")
+
+        return jsonify({
+            "status":     "ok",
+            "follow_ups": len(sent),
+            "details":    sent,
+        })
+    except Exception as e:
+        print(f"[ERREUR] /api/prospects/follow-up : {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/prospects/campaigns")
+def api_campaigns():
+    """Liste les campagnes."""
+    return jsonify({"items": get_campaigns()})
+
+
+@app.route("/api/prospects/campaigns", methods=["POST"])
+def api_create_campaign():
+    """Crée une campagne."""
+    data = request.get_json() or {}
+    name = data.get("name", "Campagne sans nom")
+    desc = data.get("description", "")
+    sectors = data.get("sectors", [])
+    cid = create_campaign(name, desc, sectors)
+    return jsonify({"status": "ok", "campaign_id": cid})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  SCHEDULER — Prospection automatique
+# ══════════════════════════════════════════════════════════════════════════════
+
+def scheduled_prospect_generate():
+    """
+    Scheduler : génère des emails de prospection à partir des nouveaux AO.
+    - Utilise les AO avec score >= 50 qui ont des contacts.
+    - S'arrête à max 10 prospects par cycle pour gérer le budget DeepSeek.
+    """
+    import datetime
+    now = datetime.datetime.now().strftime('%H:%M:%S')
+    print(f"\n[PROSPECT-GEN] ⏰ {now} — Génération d'emails de prospection")
+
+    tenders = get_all_tenders()
+    candidates = [
+        t for t in tenders
+        if t.get("contact") and t["contact"].get("email")
+        and t["contact"].get("organisation")
+        and t.get("score", 0) >= 50
+    ]
+    candidates.sort(key=lambda t: t.get("score", 0), reverse=True)
+    candidates = candidates[:10]
+
+    if not candidates:
+        print("  [PROSPECT-GEN] Aucun candidat")
+        return
+
+    generated = 0
+    for tender in candidates:
+        contact = tender.get("contact", {})
+        quality = score_prospect_quality(tender)
+        if quality < 30:
+            continue
+
+        existing = create_prospect(
+            company_name     = contact.get("organisation", ""),
+            contact_email    = contact.get("email", ""),
+            contact_name     = contact.get("responsable", ""),
+            contact_phone    = contact.get("telephone", ""),
+            source_tender_id = tender.get("id", ""),
+            source_url       = tender.get("source_url", ""),
+            sector           = tender.get("sector", ""),
+            score            = quality,
+        )
+        if not existing:
+            continue
+
+        try:
+            email = generate_prospect_email(tender)
+            update_prospect_status(existing, "DRAFT",
+                subject=email.get("subject", ""),
+                body_html=email.get("body_html", ""),
+                body_text=email.get("body_text", ""),
+                call_to_action=email.get("call_to_action", ""),
+                confidence=email.get("confidence", 0),
+            )
+            generated += 1
+            print(f"  [PROSPECT-GEN] ✓ {contact.get('organisation','')[:30]}")
+        except Exception as e:
+            print(f"  [PROSPECT-GEN] ✗ {e}")
+
+        # Petite pause entre chaque appel DeepSeek
+        import time
+        time.sleep(random.uniform(1, 3))
+
+    print(f"  [PROSPECT-GEN] ✅ {generated} emails générés")
+
+
+def scheduled_prospect_send_all():
+    """
+    Scheduler : envoie les emails de prospection en attente vers TOUS les destinataires réels.
+    - S'exécute après generation pour envoyer les DRAFT.
+    - Limité à 5 par cycle pour respecter les limites SMTP.
+    """
+    import datetime
+    now = datetime.datetime.now().strftime('%H:%M:%S')
+    print(f"\n[PROSPECT-SEND] ⏰ {now} — Envoi des emails de prospection")
+
+    from utils.notifier import _send_email
+
+    drafts = get_prospects_to_send(limit=5)
+    if not drafts:
+        print("  [PROSPECT-SEND] Aucun prospect en attente")
+        return
+
+    sent = 0
+    bounced = 0
+    for prospect in drafts:
+        subject    = prospect.get("subject", "") or ""
+        body_html  = prospect.get("body_html", "") or ""
+        to_email   = prospect["contact_email"]
+
+        if not subject or not body_html:
+            continue
+
+        ok = _send_email(to_email, subject, body_html)
+        if ok:
+            mark_prospect_sent(prospect["id"])
+            log_prospect_action(prospect["id"], "SENT", f"Auto → {to_email}")
+            sent += 1
+            print(f"  [PROSPECT-SEND] ✓ {prospect.get('company_name','')[:25]} → {to_email}")
+        else:
+            update_prospect_status(prospect["id"], "BOUNCED")
+            log_prospect_action(prospect["id"], "BOUNCED", f"Auto bounce → {to_email}")
+            bounced += 1
+
+    print(f"  [PROSPECT-SEND] ✅ {sent} envoyés · {bounced} rebondis")
+
+
+def scheduled_prospect_send_test():
+    """
+    Scheduler TEST : envoie les emails de prospection UNIQUEMENT vers aymarbly559@gmail.com
+    pour validation avant envoi réel.
+    """
+    import datetime
+    now = datetime.datetime.now().strftime('%H:%M:%S')
+    print(f"\n[PROSPECT-TEST] ⏰ {now} — Envoi test vers aymarbly559@gmail.com")
+
+    from utils.notifier import _send_email
+
+    test_email = "aymarbly559@gmail.com"
+    drafts = get_prospects_to_send(limit=3)
+
+    if not drafts:
+        print("  [PROSPECT-TEST] Aucun prospect en attente")
+        return
+
+    sent = 0
+    for prospect in drafts:
+        subject    = prospect.get("subject", "") or ""
+        body_html  = prospect.get("body_html", "") or ""
+
+        if not subject or not body_html:
+            continue
+
+        # Ajouter [TEST] dans le sujet pour les identifier
+        test_subject = f"[TEST PROSPECTION] {subject}"
+        ok = _send_email(test_email, test_subject, body_html)
+        if ok:
+            log_prospect_action(prospect["id"], "TEST_SENT",
+                f"Test envoyé à {test_email}")
+            sent += 1
+            print(f"  [PROSPECT-TEST] ✓ Test → {test_email} : {subject[:40]}")
+        else:
+            print(f"  [PROSPECT-TEST] ✗ Échec test")
+
+    print(f"  [PROSPECT-TEST] ✅ {sent} emails test envoyés")
+
 
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
@@ -516,6 +911,88 @@ def scheduled_search():
 #     id="search_weekend", max_instances=1,
 # )
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  SCHEDULER JOBS — Prospection
+# ══════════════════════════════════════════════════════════════════════════════
+
+# TEST : génération de prospection toutes les 30 minutes (envoi TEST vers aymarbly)
+scheduler.add_job(
+    func=scheduled_prospect_generate, trigger="interval",
+    minutes=30, id="prospect_generate", max_instances=1,
+)
+scheduler.add_job(
+    func=scheduled_prospect_send_test, trigger="interval",
+    minutes=35, id="prospect_send_test", max_instances=1,
+)
+
+# PROD : génération tous les jours à 08h, envoi à 09h
+# scheduler.add_job(
+#     func=scheduled_prospect_generate, trigger="cron",
+#     hour=8, minute=0, id="prospect_gen_am", max_instances=1,
+# )
+# scheduler.add_job(
+#     func=scheduled_prospect_send_all, trigger="cron",
+#     hour=9, minute=0, id="prospect_send_am", max_instances=1,
+# )
+# scheduler.add_job(
+#     func=scheduled_prospect_generate, trigger="cron",
+#     hour=14, minute=0, id="prospect_gen_pm", max_instances=1,
+# )
+# scheduler.add_job(
+#     func=scheduled_prospect_send_all, trigger="cron",
+#     hour=15, minute=0, id="prospect_send_pm", max_instances=1,
+# )
+
+# RELANCE : tous les jours à 10h (prospects sans réponse depuis 7+ jours)
+scheduler.add_job(
+    func=lambda: _run_follow_up(), trigger="interval",
+    hours=24, id="prospect_follow_up", max_instances=1,
+)
+
+def _run_follow_up():
+    """Wrapper pour les relances automatiques."""
+    import datetime
+    now = datetime.datetime.now().strftime('%H:%M:%S')
+    print(f"\n[FOLLOW-UP] ⏰ {now} — Relances automatiques")
+
+    from utils.llm_prospect import generate_follow_up_email
+    from utils.notifier    import _send_email
+
+    candidates = get_prospects_for_follow_up(days_since_last=7, limit=5)
+    if not candidates:
+        print("  [FOLLOW-UP] Aucun prospect à relancer")
+        return
+
+    sent = 0
+    for prospect in candidates:
+        previous = {
+            "subject":  prospect.get("subject", ""),
+            "body_text": prospect.get("body_text", ""),
+        }
+        try:
+            email = generate_follow_up_email(prospect, previous)
+        except Exception as e:
+            print(f"  [FOLLOW-UP] ✗ {e}")
+            continue
+
+        ok = _send_email(prospect["contact_email"], email["subject"], email["body_html"])
+        if ok:
+            follow_count = (prospect.get("follow_up_count") or 0) + 1
+            update_prospect_status(prospect["id"], "FOLLOW_UP",
+                follow_up_count=follow_count,
+                subject=email.get("subject", ""),
+                body_html=email.get("body_html", ""),
+                body_text=email.get("body_text", ""),
+            )
+            log_prospect_action(prospect["id"], "FOLLOW_UP",
+                f"Auto relance #{follow_count}")
+            sent += 1
+            print(f"  [FOLLOW-UP] ✓ {prospect.get('company_name','')[:25]} relance #{follow_count}")
+
+    print(f"  [FOLLOW-UP] ✅ {sent} relances envoyées")
+
+
 # scheduler.start()
 atexit.register(lambda: scheduler.shutdown())
 
@@ -524,9 +1001,21 @@ atexit.register(lambda: scheduler.shutdown())
 if __name__ == "__main__":
     init_db()
     init_users()
-    print(f"\n[APP] Dashboard   → http://localhost:5000")
-    print(f"[APP] Test email  → http://localhost:5000/api/test-email")
-    print(f"[APP] Requêtes    → {len(ALL_QUERIES)} au total")
-    print(f"[APP] Filtre CI   → {len(KEYWORDS_CI)} mots-clés (pré-filtre DeepSeek)")
-    print(f"[APP] Catégories  → {list(SEARCH_QUERIES.keys())}\n")
+    init_prospects()
+    print(f"\n{'='*60}")
+    print(f"  🚀 AO TRACKER — INFOSOLUCES SARL")
+    print(f"{'='*60}")
+    print(f"  Dashboard     → http://localhost:5000")
+    print(f"  Test email    → http://localhost:5000/api/test-email")
+    print(f"  Prospects     → http://localhost:5000/api/prospects")
+    print(f"  Générer       → POST /api/prospects/generate")
+    print(f"  Envoyer       → POST /api/prospects/send")
+    print(f"  Relancer      → POST /api/prospects/follow-up")
+    print(f"  Stats         → /api/prospects/stats")
+    print(f"  Campagnes     → /api/prospects/campaigns")
+    print(f"  Requêtes      → {len(ALL_QUERIES)} au total")
+    print(f"  Filtre CI     → {len(KEYWORDS_CI)} mots-clés")
+    print(f"  Catégories    → {list(SEARCH_QUERIES.keys())}")
+    print(f"  Prospection   → Test toutes les 30 min")
+    print(f"{'='*60}\n")
     app.run(debug=True, port=5000, use_reloader=True)
