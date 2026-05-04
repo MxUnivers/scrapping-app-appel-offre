@@ -1300,22 +1300,22 @@ def scheduled_search():
 # )
 
 # PROD : lundi–vendredi à 07h
-# scheduler.add_job(
-#     func=scheduled_search,
-#     trigger="cron",
-#     day_of_week="mon,thu",  # 2 jours seulement
-#     hour=7,
-#     minute=0,
-#     id="search_semaine",
-#     max_instances=1,
-# )
+scheduler.add_job(
+    func=scheduled_search,
+    trigger="cron",
+    day_of_week="mon,thu",  # 2 jours seulement
+    hour=8,
+    minute=0,
+    id="search_semaine",
+    max_instances=1,
+)
 
 # WEEKEND : rappels AO urgents seulement
-# scheduler.add_job(
-#     func=notify_urgent_tenders, trigger="cron",
-#     day_of_week="sat,sun", hour=9, minute=0,
-#     id="search_weekend", max_instances=1,
-# )
+scheduler.add_job(
+    func=notify_urgent_tenders, trigger="cron",
+    day_of_week="sat,sun", hour=9, minute=0,
+    id="search_weekend", max_instances=1,
+)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1404,21 +1404,21 @@ def _run_follow_up():
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Auto-expiration des AO (quotidien à 02h00)
-# scheduler.add_job(
-#     func=scheduled_expire_tenders, trigger="cron",
-#     hour=2, minute=0, id="expire_tenders", max_instances=1,
-# )
+scheduler.add_job(
+    func=scheduled_expire_tenders, trigger="cron",
+    hour=2, minute=0, id="expire_tenders", max_instances=1,
+)
 
-# Vérification documentaire (quotidien à 06h00)
-# scheduler.add_job(
-#     func=scheduled_document_check,
-#     trigger="cron",
-#     day="1,15",   # deux fois par mois
-#     hour=6,
-#     minute=0,
-#     id="doc_check",
-#     max_instances=1,
-# )
+# Vérification documentaire (deux fois par mois)
+scheduler.add_job(
+    func=scheduled_document_check,
+    trigger="cron",
+    day="1,15",   # deux fois par mois
+    hour=6,
+    minute=0,
+    id="doc_check",
+    max_instances=1,
+)
 
 
 scheduler.start()
