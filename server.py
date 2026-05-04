@@ -1294,10 +1294,10 @@ def scheduled_search():
 
 
 # TEST : toutes les 5 min
-scheduler.add_job(
-    func=scheduled_search, trigger="interval",
-    minutes=5, id="auto_search", max_instances=1,
-)
+# scheduler.add_job(
+#     func=scheduled_search, trigger="interval",
+#     minutes=5, id="auto_search", max_instances=1,
+# )
 
 # PROD : lundi–vendredi à 07h
 # scheduler.add_job(
@@ -1404,21 +1404,21 @@ def _run_follow_up():
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Auto-expiration des AO (quotidien à 02h00)
-scheduler.add_job(
-    func=scheduled_expire_tenders, trigger="cron",
-    hour=2, minute=0, id="expire_tenders", max_instances=1,
-)
+# scheduler.add_job(
+#     func=scheduled_expire_tenders, trigger="cron",
+#     hour=2, minute=0, id="expire_tenders", max_instances=1,
+# )
 
 # Vérification documentaire (quotidien à 06h00)
-scheduler.add_job(
-    func=scheduled_document_check,
-    trigger="cron",
-    day="1,15",   # deux fois par mois
-    hour=6,
-    minute=0,
-    id="doc_check",
-    max_instances=1,
-)
+# scheduler.add_job(
+#     func=scheduled_document_check,
+#     trigger="cron",
+#     day="1,15",   # deux fois par mois
+#     hour=6,
+#     minute=0,
+#     id="doc_check",
+#     max_instances=1,
+# )
 
 
 scheduler.start()
