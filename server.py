@@ -23,6 +23,107 @@ app = Flask(__name__)
 CORS(app)
 scheduler = BackgroundScheduler()
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  LOGGER DE REQUÊTES — Affiche chaque appel API dans la console
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.before_request
+def log_request():
+    """Log chaque requête API avec timestamp, méthode, chemin et paramètres."""
+    if request.path.startswith("/api/"):
+        ts = dt.datetime.now().strftime("%H:%M:%S")
+        method = request.method
+        path = request.path
+        args = dict(request.args)
+        if request.is_json and request.method in ("POST", "PATCH"):
+            body = request.get_json(silent=True) or {}
+            # Masquer les données sensibles
+            safe_body = {k: (v[:20] + "..." if isinstance(v, str) and len(v) > 20 else v) for k, v in body.items()}
+            print(f"  [API] {ts} {method} {path} ↴")
+            print(f"        ⇢ args: {args}" if args else "", end="")
+            print(f"        ⇢ body: {safe_body}" if safe_body else "")
+        else:
+            print(f"  [API] {ts} {method} {path}  args: {args}" if args else f"  [API] {ts} {method} {path}")
+
+
+@app.after_request
+def log_response(response):
+    """Log le statut de la réponse."""
+    if request.path.startswith("/api/"):
+        ts = dt.datetime.now().strftime("%H:%M:%S")
+        status = response.status_code
+        icon = "✅" if status < 400 else ("⚠️" if status < 500 else "❌")
+        print(f"  [API] {ts} {icon} {status}")
+    return response
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  LISTE DES ROUTES — Endpoint pour voir toutes les routes disponibles
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.route("/api/routes", methods=["GET"])
+def api_list_routes():
+    """Retourne la liste de toutes les routes API disponibles."""
+    rules = []
+    for rule in app.url_map.iter_rules():
+        if rule.rule.startswith("/api/"):
+            methods = [m for m in rule.methods if m in ("GET", "POST", "PATCH", "DELETE")]
+            rules.append({
+                "path": rule.rule,
+                "methods": methods,
+                "endpoint": rule.endpoint,
+            })
+    rules.sort(key=lambda r: r["path"])
+    return jsonify({
+        "total": len(rules),
+        "routes": rules,
+    })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  ÉTAT DU SCHEDULER — Voir les tâches automatiques à venir
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.route("/api/scheduler", methods=["GET"])
+def api_scheduler_status():
+    """Retourne l'état du scheduler : tâches programmées et prochaine exécution."""
+    jobs = []
+    for job in scheduler.get_jobs():
+        next_run = job.next_run_time
+        jobs.append({
+            "id": job.id,
+            "name": job.name or job.id,
+            "trigger": str(job.trigger),
+            "next_run": next_run.isoformat() if next_run else None,
+            "next_run_human": _time_until(next_run) if next_run else "Désactivé",
+        })
+    jobs.sort(key=lambda j: j.get("next_run") or "")
+    return jsonify({
+        "total": len(jobs),
+        "running": scheduler.running,
+        "jobs": jobs,
+    })
+
+
+def _time_until(dt_from_schedule):
+    """Retourne un texte lisible du temps restant avant la prochaine exécution."""
+    now = dt.datetime.now(dt_from_schedule.tzinfo)
+    diff = dt_from_schedule - now
+    total_seconds = int(diff.total_seconds())
+    if total_seconds <= 0:
+        return "Imminent"
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    parts = []
+    if hours > 0:
+        parts.append(f"{hours}h")
+    if minutes > 0:
+        parts.append(f"{minutes}min")
+    if seconds > 0 and hours == 0:
+        parts.append(f"{seconds}s")
+    return " ".join(parts) if parts else "Imminent"
+
+
 # ── Routes dashboard ──────────────────────────────────────────────────────────
 
 @app.route("/")
@@ -1193,16 +1294,20 @@ def scheduled_search():
 
 
 # TEST : toutes les 5 min
-# scheduler.add_job(
-#     func=scheduled_search, trigger="interval",
-#     minutes=5, id="auto_search", max_instances=1,
-# )
+scheduler.add_job(
+    func=scheduled_search, trigger="interval",
+    minutes=5, id="auto_search", max_instances=1,
+)
 
-# PROD : lundi–vendredi à 07h, 12h, 17h
+# PROD : lundi–vendredi à 07h
 # scheduler.add_job(
-#     func=scheduled_search, trigger="cron",
-#     day_of_week="mon-fri", hour="7,12,17", minute=0,
-#     id="search_semaine", max_instances=1,
+#     func=scheduled_search,
+#     trigger="cron",
+#     day_of_week="mon,thu",  # 2 jours seulement
+#     hour=7,
+#     minute=0,
+#     id="search_semaine",
+#     max_instances=1,
 # )
 
 # WEEKEND : rappels AO urgents seulement
@@ -1306,12 +1411,17 @@ scheduler.add_job(
 
 # Vérification documentaire (quotidien à 06h00)
 scheduler.add_job(
-    func=scheduled_document_check, trigger="cron",
-    hour=6, minute=0, id="doc_check", max_instances=1,
+    func=scheduled_document_check,
+    trigger="cron",
+    day="1,15",   # deux fois par mois
+    hour=6,
+    minute=0,
+    id="doc_check",
+    max_instances=1,
 )
 
 
-# scheduler.start()
+scheduler.start()
 atexit.register(lambda: scheduler.shutdown())
 
 # ── Démarrage ─────────────────────────────────────────────────────────────────
@@ -1337,7 +1447,19 @@ if __name__ == "__main__":
     print(f"  Requêtes      → {len(ALL_QUERIES)} au total")
     print(f"  Filtre CI     → {len(KEYWORDS_CI)} mots-clés")
     print(f"  Catégories    → {list(SEARCH_QUERIES.keys())}")
+    print(f"  Scheduler      → /api/scheduler")
     print(f"  Prospection   → Test toutes les 30 min")
     print(f"  Auto-expire   → Quotidien 02h00")
     print(f"{'='*60}\n")
+
+    # Afficher les tâches programmées dans la console
+    print(f"  ⏰ Tâches programmées :")
+    for job in scheduler.get_jobs():
+        next_run = job.next_run_time
+        if next_run:
+            human = _time_until(next_run)
+            print(f"     • {job.id:<25} prochaine exécution dans {human}")
+        else:
+            print(f"     • {job.id:<25} désactivé")
+    print()
     app.run(debug=True, port=5000, use_reloader=True)

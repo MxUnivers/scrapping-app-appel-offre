@@ -43,7 +43,8 @@ Analyse le document ci-dessous et retourne UNIQUEMENT un JSON valide :
   },
   "score": 0-100,
   "score_reason": "explication",
-  "recommandation": "Que doit faire INFOSOLUCES avec ce document ?"
+  "recommandation": "Que doit faire INFOSOLUCES qui est spécialisé dans le dévelopement Informatique , Réseau , Cyber-Sécurité ,
+    Electricité, BTP ,  avec ce document ?"
 }
 """.strip()
 
