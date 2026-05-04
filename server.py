@@ -1268,7 +1268,7 @@ def scheduled_search():
 
     for q in ALL_QUERIES:
         try:
-            found = search_tenders(q, pre_filter=_is_worth_analyzing)
+            found = search_tenders(q)
             all_new.extend(found)
         except Exception as e:
             print(f"[SCHEDULER] ⚠️  Erreur '{q[:40]}...': {e}")
