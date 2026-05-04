@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>INFOSOLUCES &middot; Démo Prospection IA</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family:'Segoe UI',Arial,sans-serif;
+    background:linear-gradient(135deg,#0d0f14 0%,#1a1d2e 100%);
+    color:#fff;
+    min-height:100vh;
+  }
+  .hero {
+    text-align:center;
+    padding:50px 20px 35px;
+    background:linear-gradient(135deg,#f0a500 0%,#e89200 60%,#d48000 100%);
+    color:#0d0f14;
+    position:relative;
+    overflow:hidden;
+  }
+  .hero::after {
+    content:'';
+    position:absolute;
+    top:0;left:0;right:0;bottom:0;
+    background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%230d0f14' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    pointer-events:none;
+  }
+  .hero-content { position:relative; z-index:1; }
+  .hero-icon { font-size:44px; margin-bottom:10px; }
+  .hero h1 { font-size:30px; font-weight:800; letter-spacing:-0.5px; }
+  .hero p { font-size:15px; opacity:0.7; margin-top:4px; }
+  .hero .badge {
+    display:inline-block; background:#0066cc; color:#fff;
+    padding:5px 20px; border-radius:20px; font-size:12px; font-weight:700;
+    margin-top:12px; text-transform:uppercase; letter-spacing:1px;
+    box-shadow:0 2px 8px rgba(0,102,204,0.3);
+  }
+  .stats {
+    display:flex; justify-content:center; gap:30px;
+    padding:18px; background:rgba(255,255,255,0.05);
+    margin-top:16px; border-radius:10px; max-width:500px; margin-left:auto;margin-right:auto;
+  }
+  .stat { text-align:center; }
+  .stat-num { font-size:22px; font-weight:800; color:#f0a500; }
+  .stat-label { font-size:11px; color:#888; }
+  .nav {
+    display:flex; justify-content:center; gap:8px;
+    padding:14px 10px; flex-wrap:wrap;
+    position:sticky; top:0; z-index:100;
+    background:rgba(13,15,20,0.95);
+    backdrop-filter:blur(12px);
+    border-bottom:1px solid rgba(255,255,255,0.08);
+  }
+  .nav a {
+    color:#f0a500; text-decoration:none; font-size:12px; font-weight:600;
+    padding:8px 16px; border-radius:8px;
+    background:rgba(240,165,0,0.08);
+    transition:all 0.2s; white-space:nowrap;
+  }
+  .nav a:hover { background:rgba(240,165,0,0.2); transform:translateY(-1px); }
+  .container { max-width:680px; margin:auto; padding:20px 12px; }
+  .case-card {
+    background:#151829; border-radius:12px; overflow:hidden;
+    margin-bottom:24px; border:1px solid rgba(255,255,255,0.08);
+    transition:transform 0.2s;
+  }
+  .case-card:hover { transform:translateY(-2px); }
+  .case-header {
+    display:flex; align-items:center; gap:12px;
+    padding:16px 20px;
+    background:rgba(255,255,255,0.03);
+    border-bottom:1px solid rgba(255,255,255,0.06);
+    position:relative;
+  }
+  .case-icon { font-size:28px; }
+  .case-header h2 { font-size:16px; font-weight:700; }
+  .case-meta { font-size:12px; color:#888; margin-top:2px; }
+  .case-num {
+    margin-left:auto; font-size:13px; font-weight:800;
+    color:rgba(255,255,255,0.15); letter-spacing:1px;
+  }
+  .email-preview {
+    background:#ffffff; color:#333;
+    font-size:14px; line-height:1.6;
+  }
+  .email-preview table { max-width:100% !important; }
+  .email-preview img { max-width:100% !important; height:auto; }
+  .footer {
+    text-align:center; padding:30px 20px; color:#555; font-size:12px; line-height:1.8;
+  }
+  .footer strong { color:#f0a500; }
+  .footer .bar { display:inline-block; width:40px; height:2px; background:#f0a500; margin:0 10px; vertical-align:middle; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-content">
+    <div class="hero-icon">🚀</div>
+    <h1>Prospection B2B Automatisée</h1>
+    <p>5 emails personnalisés générés par DeepSeek &middot; Template orange &amp; bleu</p>
+    <div class="badge">⚙️ Propulsé par l’IA &middot; INFOSOLUCES SARL</div>
+    <div class="stats">
+      <div class="stat"><div class="stat-num">5</div><div class="stat-label">Cas concrets</div></div>
+      <div class="stat"><div class="stat-num">100%</div><div class="stat-label">Personnalisés IA</div></div>
+      <div class="stat"><div class="stat-num">30s</div><div class="stat-label">Par email</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="nav">
+  <a href="#case1">🏛 Digitalisation</a>
+  <a href="#case2">🏥 Cyber</a>
+  <a href="#case3">🏭 ERP</a>
+  <a href="#case4">🏦 Réseau</a>
+  <a href="#case5">🏗 Infogérance</a>
+</div>
+
+<div class="container">
+  
+    <div class="case-card" id="case1" style="border-left:4px solid #f0a500;">
+        <div class="case-header">
+            <span class="case-icon">🏛</span>
+            <div>
+                <h2 style="color:#f0a500;">Digitalisation municipale</h2>
+                <p class="case-meta">Développement Web | 85 M FCFA &bull; Mairie de Cocody</p>
+            </div>
+            <span class="case-num">#1</span>
+        </div>
+        <div class="email-preview">
+            <table width="620" cellpadding="0" cellspacing="0" style="
+        max-width:620px; width:100%;
+        background:#ffffff;
+        border-radius:16px;
+        overflow:hidden;
+        box-shadow:0 8px 40px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+      ">
+
+        <!-- ▸ BANDE DÉGRADÉE HAUT ----------------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(135deg,#0d0f14 0%,#1a1d2e 40%,#0066cc 100%);
+            padding:6px 0;
+          ">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="width:8px;background:#f0a500;"></td>
+                <td style="padding:0;"></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ EN-TÊTE ORANGE + LOGO --------------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(135deg,#f0a500 0%,#e89200 60%,#d48000 100%);
+            padding:0;
+          ">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:18px 28px;">
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <!-- Logo -->
+                      <td style="width:52px;">
+                        <img src="https://res.cloudinary.com/dsgd2h3dx/image/upload/v1772619527/logo_rfv6lb.jpg"
+                             alt="INFOSOLUCES"
+                             width="48" height="48"
+                             style="border-radius:10px;display:block;
+                                    box-shadow:0 2px 8px rgba(0,0,0,0.15);"
+                             onerror="this.style.display='none'">
+                      </td>
+                      <!-- Nom entreprise -->
+                      <td style="padding-left:14px;">
+                        <span style="
+                          color:#0d0f14;font-size:20px;font-weight:800;
+                          letter-spacing:-0.3px;text-shadow:0 1px 2px rgba(255,255,255,0.15);
+                        ">INFOSOLUCES</span>
+                        <span style="
+                          color:#3a2a0a;font-size:11px;display:block;
+                          opacity:0.8;font-weight:500;
+                        ">Solutions IT &bull; Abidjan, C&ocirc;te d'Ivoire</span>
+                      </td>
+                      <!-- Badge -->
+                      <td align="right" style="vertical-align:middle;">
+                        <span style="
+                          background:#0066cc;color:#ffffff;
+                          font-size:10px;padding:5px 14px;
+                          border-radius:20px;font-weight:700;
+                          letter-spacing:1px;text-transform:uppercase;
+                          box-shadow:0 2px 6px rgba(0,102,204,0.3);
+                        ">Proposition</span>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ BARRE ACCENT BLEU --------------------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(90deg,#0066cc 0%,#3399ff 50%,#0066cc 100%);
+            height:5px;
+          "></td>
+        </tr>
+
+        <!-- ▸ CORPS DE L'EMAIL ───────────────────────────────── -->
+        <tr>
+          <td style="padding:32px 34px 20px;background:#ffffff;">
+            <p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Bonjour Monsieur N'Guessan,</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Nous avons pris connaissance de votre appel d'offres pour la digitalisation des services municipaux de Cocody, et nous souhaitons vous soumettre notre candidature en tant que partenaire technique.</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">INFOSOLUCES SARL, PME ivoirienne spécialisée en solutions IT, a déjà réalisé avec succès des projets similaires, notamment un portail de e-gouvernement pour plusieurs mairies d'Abidjan et un portail marchés publics pour l'ANRMP. Forts de cette expérience, nous proposons une solution modulaire et évolutive pour votre portail web, intégrant la gestion des demandes administratives, le paiement en ligne des taxes et un tableau de bord pour vos agents. Notre approche flexible permet de s'adapter à votre budget, avec la possibilité de déployer le projet par phases (par exemple, prioriser les modules les plus critiques comme les paiements en ligne).</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Nous sommes disponibles pour vous présenter une démonstration de notre solution et un devis personnalisé, adapté à vos besoins. Compte tenu de l'échéance du 15 juin 2026, nous vous proposons de planifier un rendez-vous dès cette semaine pour discuter des détails.</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Cordialement,
+L'équipe INFOSOLUCES</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">INFOSOLUCES SARL
+Rue des Bambous, Cocody Danga, Abidjan
+Tél : +225 27 22 52 40 88 | Mobile : +225 01 73 73 73 97
+Email : contact@infosoluces.ci
+Site : https://infosoluces.ci
+Facebook : https://www.facebook.com/Infosoluces/
+LinkedIn : https://ci.linkedin.com/company/infosoluces</p>
+          </td>
+        </tr>
+
+        <!-- ▸ SÉPARATEUR ÉLÉGANT --------------------------------- -->
+        <tr>
+          <td style="padding:0 34px 24px;background:#ffffff;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="border-bottom:1px solid #eee;"></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ BOUTONS CTA --------------------------------------- -->
+        <tr>
+          <td style="padding:0 34px 28px;background:#ffffff;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td align="center">
+                  <table cellpadding="0" cellspacing="0">
+                    <tr>
+                      <!-- Bouton principal : Contact -->
+                      <td style="
+                        background:linear-gradient(135deg,#0066cc,#0052a3);
+                        border-radius:8px;padding:0;
+                        box-shadow:0 4px 12px rgba(0,102,204,0.35);
+                      ">
+                        <a href="https://infosoluces.ci/contact"
+                           style="
+                            display:inline-block;padding:13px 36px;
+                            color:#ffffff;font-size:14px;font-weight:700;
+                            text-decoration:none;border-radius:8px;
+                            letter-spacing:0.3px;
+                        ">
+                          Nous contacter
+                        </a>
+                      </td>
+                      <td width="14"></td>
+                      <!-- Bouton secondaire : Site -->
+                      <td style="
+                        background:#0d0f14;border-radius:8px;padding:0;
+                        box-shadow:0 4px 12px rgba(13,15,20,0.25);
+                      ">
+                        <a href="https://infosoluces.ci"
+                           style="
+                            display:inline-block;padding:13px 28px;
+                            color:#f0a500;font-size:14px;font-weight:700;
+                            text-decoration:none;border-radius:8px;
+                            letter-spacing:0.3px;
+                        ">
+                          Site web
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ FOOTER COORDONNÉES + RÉSEAUX ---------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(135deg,#0d0f14 0%,#1a1d2e 100%);
+            padding:22px 30px;
+          ">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <!-- Coordonnées -->
+                <td style="font-size:12px;color:#888;line-height:1.6;">
+                  <strong style="color:#f0a500;font-size:13px;">INFOSOLUCES SARL</strong><br>
+                  Rue des Bambous, Cocody Danga, Abidjan<br>
+                  T&eacute;l&nbsp;: +225 27 22 52 40 88
+                  &nbsp;|&nbsp; Mobile : +225 01 73 73 73 97<br>
+                  <a href="mailto:contact@infosoluces.ci"
+                     style="color:#f0a500;text-decoration:none;">
+                    contact@infosoluces.ci
+                  </a>
+                </td>
+                <!-- Icônes réseaux sociaux avec badges colorés -->
+                <td align="right" style="vertical-align:top;">
+                  <!-- Site web -->
+                  <table cellpadding="0" cellspacing="0" style="display:inline-block;margin-bottom:6px;">
+                    <tr>
+                      <td style="background:#f0a500;border-radius:4px 0 0 4px;padding:4px 6px;font-size:11px;">🌐</td>
+                      <td style="background:rgba(240,165,0,0.15);border-radius:0 4px 4px 0;padding:4px 8px;">
+                        <a href="https://infosoluces.ci"
+                           style="color:#f0a500;text-decoration:none;font-size:11px;font-weight:600;">
+                          Site web
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                  <br>
+                  <!-- Facebook -->
+                  <table cellpadding="0" cellspacing="0" style="display:inline-block;margin-bottom:6px;">
+                    <tr>
+                      <td style="background:#1877f2;border-radius:4px 0 0 4px;padding:4px 6px;font-size:11px;">f</td>
+                      <td style="background:rgba(24,119,242,0.15);border-radius:0 4px 4px 0;padding:4px 8px;">
+                        <a href="https://www.facebook.com/Infosoluces/"
+                           style="color:#1877f2;text-decoration:none;font-size:11px;font-weight:600;">
+                          Facebook
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                  <br>
+                  <!-- LinkedIn -->
+                  <table cellpadding="0" cellspacing="0" style="display:inline-block;">
+                    <tr>
+                      <td style="background:#0a66c2;border-radius:4px 0 0 4px;padding:4px 6px;font-size:11px;color:#fff;font-weight:bold;">in</td>
+                      <td style="background:rgba(10,102,194,0.15);border-radius:0 4px 4px 0;padding:4px 8px;">
+                        <a href="https://ci.linkedin.com/company/infosoluces"
+                           style="color:#0a66c2;text-decoration:none;font-size:11px;font-weight:600;">
+                          LinkedIn
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ FIN DE LA CARTE ─────────────────────────────────── -->
+      </table>
+
+      <!-- ▸ MENTION LÉGALE MINI ──────────────────────────────── -->
+      <table width="620" cellpadding="0" cellspacing="0" style="max-width:620px;width:100%;margin-top:12px;">
+        <tr>
+          <td style="
+            font-size:10px;color:#999;text-align:center;padding:8px 10px;
+            line-height:1.5;
+          ">
+            Cet email vous a &eacute;t&eacute; envoy&eacute; par
+            <strong style="color:#777;">INFOSOLUCES SARL</strong> dans le cadre
+            d'une prospection commerciale.
+          </td>
+        </tr>
+      </table>
+
+    </td>
+  </tr>
+</table>
+
+
+        </div>
+    </div>
+    
+
+    <div class="case-card" id="case2" style="border-left:4px solid #e74c3c;">
+        <div class="case-header">
+            <span class="case-icon">🏥</span>
+            <div>
+                <h2 style="color:#e74c3c;">Cybersécurité hospitalière</h2>
+                <p class="case-meta">Cybersécurité | 45 M FCFA &bull; CHU de Treichville</p>
+            </div>
+            <span class="case-num">#2</span>
+        </div>
+        <div class="email-preview">
+            <table width="620" cellpadding="0" cellspacing="0" style="
+        max-width:620px; width:100%;
+        background:#ffffff;
+        border-radius:16px;
+        overflow:hidden;
+        box-shadow:0 8px 40px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+      ">
+
+        <!-- ▸ BANDE DÉGRADÉE HAUT ----------------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(135deg,#0d0f14 0%,#1a1d2e 40%,#0066cc 100%);
+            padding:6px 0;
+          ">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="width:8px;background:#f0a500;"></td>
+                <td style="padding:0;"></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ EN-TÊTE ORANGE + LOGO --------------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(135deg,#f0a500 0%,#e89200 60%,#d48000 100%);
+            padding:0;
+          ">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:18px 28px;">
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <!-- Logo -->
+                      <td style="width:52px;">
+                        <img src="https://res.cloudinary.com/dsgd2h3dx/image/upload/v1772619527/logo_rfv6lb.jpg"
+                             alt="INFOSOLUCES"
+                             width="48" height="48"
+                             style="border-radius:10px;display:block;
+                                    box-shadow:0 2px 8px rgba(0,0,0,0.15);"
+                             onerror="this.style.display='none'">
+                      </td>
+                      <!-- Nom entreprise -->
+                      <td style="padding-left:14px;">
+                        <span style="
+                          color:#0d0f14;font-size:20px;font-weight:800;
+                          letter-spacing:-0.3px;text-shadow:0 1px 2px rgba(255,255,255,0.15);
+                        ">INFOSOLUCES</span>
+                        <span style="
+                          color:#3a2a0a;font-size:11px;display:block;
+                          opacity:0.8;font-weight:500;
+                        ">Solutions IT &bull; Abidjan, C&ocirc;te d'Ivoire</span>
+                      </td>
+                      <!-- Badge -->
+                      <td align="right" style="vertical-align:middle;">
+                        <span style="
+                          background:#0066cc;color:#ffffff;
+                          font-size:10px;padding:5px 14px;
+                          border-radius:20px;font-weight:700;
+                          letter-spacing:1px;text-transform:uppercase;
+                          box-shadow:0 2px 6px rgba(0,102,204,0.3);
+                        ">Proposition</span>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ BARRE ACCENT BLEU --------------------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(90deg,#0066cc 0%,#3399ff 50%,#0066cc 100%);
+            height:5px;
+          "></td>
+        </tr>
+
+        <!-- ▸ CORPS DE L'EMAIL ───────────────────────────────── -->
+        <tr>
+          <td style="padding:32px 34px 20px;background:#ffffff;">
+            <p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Bonjour Dr Kouamé,</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Nous avons pris connaissance de votre appel d'offres pour la sécurisation complète du réseau informatique du CHU de Treichville. En tant que PME ivoirienne spécialisée en cybersécurité, INFOSOLUCES SARL est en mesure de vous proposer une solution adaptée à vos exigences et à votre budget.</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Notre offre inclut :
+- Audit de sécurité complet (infrastructure, vulnérabilités, conformité)
+- Mise en place de firewalls nouvelle génération et segmentation réseau
+- Déploiement d'un antivirus centralisé avec supervision
+- Formation du personnel aux bonnes pratiques de cybersécurité</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Nous avons déjà réalisé des missions similaires pour des hôpitaux publics en Côte d'Ivoire (infrastructure réseau, maintenance IT). Nous pouvons vous fournir des références sur demande.</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Compte tenu de l'échéance du 30 juillet 2026, nous vous proposons un rendez-vous dès cette semaine pour vous présenter notre proposition technique et un devis personnalisé.</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Restant à votre disposition,</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">L'équipe INFOSOLUCES
+📧 contact@infosoluces.ci | 📞 +225 27 22 52 40 88
+📱 +225 01 73 73 73 97
+🔵 https://www.facebook.com/Infosoluces/
+💼 https://ci.linkedin.com/company/infosoluces</p>
+          </td>
+        </tr>
+
+        <!-- ▸ SÉPARATEUR ÉLÉGANT --------------------------------- -->
+        <tr>
+          <td style="padding:0 34px 24px;background:#ffffff;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="border-bottom:1px solid #eee;"></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ BOUTONS CTA --------------------------------------- -->
+        <tr>
+          <td style="padding:0 34px 28px;background:#ffffff;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td align="center">
+                  <table cellpadding="0" cellspacing="0">
+                    <tr>
+                      <!-- Bouton principal : Contact -->
+                      <td style="
+                        background:linear-gradient(135deg,#0066cc,#0052a3);
+                        border-radius:8px;padding:0;
+                        box-shadow:0 4px 12px rgba(0,102,204,0.35);
+                      ">
+                        <a href="https://infosoluces.ci/contact"
+                           style="
+                            display:inline-block;padding:13px 36px;
+                            color:#ffffff;font-size:14px;font-weight:700;
+                            text-decoration:none;border-radius:8px;
+                            letter-spacing:0.3px;
+                        ">
+                          Nous contacter
+                        </a>
+                      </td>
+                      <td width="14"></td>
+                      <!-- Bouton secondaire : Site -->
+                      <td style="
+                        background:#0d0f14;border-radius:8px;padding:0;
+                        box-shadow:0 4px 12px rgba(13,15,20,0.25);
+                      ">
+                        <a href="https://infosoluces.ci"
+                           style="
+                            display:inline-block;padding:13px 28px;
+                            color:#f0a500;font-size:14px;font-weight:700;
+                            text-decoration:none;border-radius:8px;
+                            letter-spacing:0.3px;
+                        ">
+                          Site web
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ FOOTER COORDONNÉES + RÉSEAUX ---------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(135deg,#0d0f14 0%,#1a1d2e 100%);
+            padding:22px 30px;
+          ">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <!-- Coordonnées -->
+                <td style="font-size:12px;color:#888;line-height:1.6;">
+                  <strong style="color:#f0a500;font-size:13px;">INFOSOLUCES SARL</strong><br>
+                  Rue des Bambous, Cocody Danga, Abidjan<br>
+                  T&eacute;l&nbsp;: +225 27 22 52 40 88
+                  &nbsp;|&nbsp; Mobile : +225 01 73 73 73 97<br>
+                  <a href="mailto:contact@infosoluces.ci"
+                     style="color:#f0a500;text-decoration:none;">
+                    contact@infosoluces.ci
+                  </a>
+                </td>
+                <!-- Icônes réseaux sociaux avec badges colorés -->
+                <td align="right" style="vertical-align:top;">
+                  <!-- Site web -->
+                  <table cellpadding="0" cellspacing="0" style="display:inline-block;margin-bottom:6px;">
+                    <tr>
+                      <td style="background:#f0a500;border-radius:4px 0 0 4px;padding:4px 6px;font-size:11px;">🌐</td>
+                      <td style="background:rgba(240,165,0,0.15);border-radius:0 4px 4px 0;padding:4px 8px;">
+                        <a href="https://infosoluces.ci"
+                           style="color:#f0a500;text-decoration:none;font-size:11px;font-weight:600;">
+                          Site web
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                  <br>
+                  <!-- Facebook -->
+                  <table cellpadding="0" cellspacing="0" style="display:inline-block;margin-bottom:6px;">
+                    <tr>
+                      <td style="background:#1877f2;border-radius:4px 0 0 4px;padding:4px 6px;font-size:11px;">f</td>
+                      <td style="background:rgba(24,119,242,0.15);border-radius:0 4px 4px 0;padding:4px 8px;">
+                        <a href="https://www.facebook.com/Infosoluces/"
+                           style="color:#1877f2;text-decoration:none;font-size:11px;font-weight:600;">
+                          Facebook
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                  <br>
+                  <!-- LinkedIn -->
+                  <table cellpadding="0" cellspacing="0" style="display:inline-block;">
+                    <tr>
+                      <td style="background:#0a66c2;border-radius:4px 0 0 4px;padding:4px 6px;font-size:11px;color:#fff;font-weight:bold;">in</td>
+                      <td style="background:rgba(10,102,194,0.15);border-radius:0 4px 4px 0;padding:4px 8px;">
+                        <a href="https://ci.linkedin.com/company/infosoluces"
+                           style="color:#0a66c2;text-decoration:none;font-size:11px;font-weight:600;">
+                          LinkedIn
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ FIN DE LA CARTE ─────────────────────────────────── -->
+      </table>
+
+      <!-- ▸ MENTION LÉGALE MINI ──────────────────────────────── -->
+      <table width="620" cellpadding="0" cellspacing="0" style="max-width:620px;width:100%;margin-top:12px;">
+        <tr>
+          <td style="
+            font-size:10px;color:#999;text-align:center;padding:8px 10px;
+            line-height:1.5;
+          ">
+            Cet email vous a &eacute;t&eacute; envoy&eacute; par
+            <strong style="color:#777;">INFOSOLUCES SARL</strong> dans le cadre
+            d'une prospection commerciale.
+          </td>
+        </tr>
+      </table>
+
+    </td>
+  </tr>
+</table>
+
+
+        </div>
+    </div>
+    
+
+    <div class="case-card" id="case3" style="border-left:4px solid #2ecc71;">
+        <div class="case-header">
+            <span class="case-icon">🏭</span>
+            <div>
+                <h2 style="color:#2ecc71;">ERP industriel</h2>
+                <p class="case-meta">ERP / Gestion | 120 M FCFA &bull; SIT Yopougon</p>
+            </div>
+            <span class="case-num">#3</span>
+        </div>
+        <div class="email-preview">
+            <table width="620" cellpadding="0" cellspacing="0" style="
+        max-width:620px; width:100%;
+        background:#ffffff;
+        border-radius:16px;
+        overflow:hidden;
+        box-shadow:0 8px 40px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+      ">
+
+        <!-- ▸ BANDE DÉGRADÉE HAUT ----------------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(135deg,#0d0f14 0%,#1a1d2e 40%,#0066cc 100%);
+            padding:6px 0;
+          ">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="width:8px;background:#f0a500;"></td>
+                <td style="padding:0;"></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ EN-TÊTE ORANGE + LOGO --------------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(135deg,#f0a500 0%,#e89200 60%,#d48000 100%);
+            padding:0;
+          ">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:18px 28px;">
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <!-- Logo -->
+                      <td style="width:52px;">
+                        <img src="https://res.cloudinary.com/dsgd2h3dx/image/upload/v1772619527/logo_rfv6lb.jpg"
+                             alt="INFOSOLUCES"
+                             width="48" height="48"
+                             style="border-radius:10px;display:block;
+                                    box-shadow:0 2px 8px rgba(0,0,0,0.15);"
+                             onerror="this.style.display='none'">
+                      </td>
+                      <!-- Nom entreprise -->
+                      <td style="padding-left:14px;">
+                        <span style="
+                          color:#0d0f14;font-size:20px;font-weight:800;
+                          letter-spacing:-0.3px;text-shadow:0 1px 2px rgba(255,255,255,0.15);
+                        ">INFOSOLUCES</span>
+                        <span style="
+                          color:#3a2a0a;font-size:11px;display:block;
+                          opacity:0.8;font-weight:500;
+                        ">Solutions IT &bull; Abidjan, C&ocirc;te d'Ivoire</span>
+                      </td>
+                      <!-- Badge -->
+                      <td align="right" style="vertical-align:middle;">
+                        <span style="
+                          background:#0066cc;color:#ffffff;
+                          font-size:10px;padding:5px 14px;
+                          border-radius:20px;font-weight:700;
+                          letter-spacing:1px;text-transform:uppercase;
+                          box-shadow:0 2px 6px rgba(0,102,204,0.3);
+                        ">Proposition</span>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ BARRE ACCENT BLEU --------------------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(90deg,#0066cc 0%,#3399ff 50%,#0066cc 100%);
+            height:5px;
+          "></td>
+        </tr>
+
+        <!-- ▸ CORPS DE L'EMAIL ───────────────────────────────── -->
+        <tr>
+          <td style="padding:32px 34px 20px;background:#ffffff;">
+            <p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Bonjour M. Traoré Adama,</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Nous avons pris connaissance de votre appel d'offres pour l'acquisition et le déploiement d'un ERP destiné à votre PME industrielle à Yopougon. INFOSOLUCES SARL, intégrateur certifié Odoo et Sage, souhaite vous accompagner dans ce projet structurant.</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Notre équipe propose une solution modulaire couvrant la gestion des stocks, la comptabilité, les RH et la production, avec une approche adaptée à votre budget. Nous incluons la formation de vos équipes et une maintenance sur 2 ans pour garantir une montée en charge réussie. Forts de notre expérience dans le secteur industriel (infrastructure pour 3 hôpitaux, portail ANRMP), nous assurons un déploiement local et réactif.</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Nous vous proposons un rendez-vous rapide pour vous présenter notre proposition technique et un devis personnalisé, avant la clôture de votre appel d'offres.</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Cordialement,
+L'équipe INFOSOLUCES</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">📧 contact@infosoluces.ci
+📞 +225 27 22 52 40 88 / +225 01 73 73 73 97
+🔵 Facebook : https://www.facebook.com/Infosoluces/
+💼 LinkedIn : https://ci.linkedin.com/company/infosoluces</p>
+          </td>
+        </tr>
+
+        <!-- ▸ SÉPARATEUR ÉLÉGANT --------------------------------- -->
+        <tr>
+          <td style="padding:0 34px 24px;background:#ffffff;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="border-bottom:1px solid #eee;"></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ BOUTONS CTA --------------------------------------- -->
+        <tr>
+          <td style="padding:0 34px 28px;background:#ffffff;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td align="center">
+                  <table cellpadding="0" cellspacing="0">
+                    <tr>
+                      <!-- Bouton principal : Contact -->
+                      <td style="
+                        background:linear-gradient(135deg,#0066cc,#0052a3);
+                        border-radius:8px;padding:0;
+                        box-shadow:0 4px 12px rgba(0,102,204,0.35);
+                      ">
+                        <a href="https://infosoluces.ci/contact"
+                           style="
+                            display:inline-block;padding:13px 36px;
+                            color:#ffffff;font-size:14px;font-weight:700;
+                            text-decoration:none;border-radius:8px;
+                            letter-spacing:0.3px;
+                        ">
+                          Nous contacter
+                        </a>
+                      </td>
+                      <td width="14"></td>
+                      <!-- Bouton secondaire : Site -->
+                      <td style="
+                        background:#0d0f14;border-radius:8px;padding:0;
+                        box-shadow:0 4px 12px rgba(13,15,20,0.25);
+                      ">
+                        <a href="https://infosoluces.ci"
+                           style="
+                            display:inline-block;padding:13px 28px;
+                            color:#f0a500;font-size:14px;font-weight:700;
+                            text-decoration:none;border-radius:8px;
+                            letter-spacing:0.3px;
+                        ">
+                          Site web
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ FOOTER COORDONNÉES + RÉSEAUX ---------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(135deg,#0d0f14 0%,#1a1d2e 100%);
+            padding:22px 30px;
+          ">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <!-- Coordonnées -->
+                <td style="font-size:12px;color:#888;line-height:1.6;">
+                  <strong style="color:#f0a500;font-size:13px;">INFOSOLUCES SARL</strong><br>
+                  Rue des Bambous, Cocody Danga, Abidjan<br>
+                  T&eacute;l&nbsp;: +225 27 22 52 40 88
+                  &nbsp;|&nbsp; Mobile : +225 01 73 73 73 97<br>
+                  <a href="mailto:contact@infosoluces.ci"
+                     style="color:#f0a500;text-decoration:none;">
+                    contact@infosoluces.ci
+                  </a>
+                </td>
+                <!-- Icônes réseaux sociaux avec badges colorés -->
+                <td align="right" style="vertical-align:top;">
+                  <!-- Site web -->
+                  <table cellpadding="0" cellspacing="0" style="display:inline-block;margin-bottom:6px;">
+                    <tr>
+                      <td style="background:#f0a500;border-radius:4px 0 0 4px;padding:4px 6px;font-size:11px;">🌐</td>
+                      <td style="background:rgba(240,165,0,0.15);border-radius:0 4px 4px 0;padding:4px 8px;">
+                        <a href="https://infosoluces.ci"
+                           style="color:#f0a500;text-decoration:none;font-size:11px;font-weight:600;">
+                          Site web
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                  <br>
+                  <!-- Facebook -->
+                  <table cellpadding="0" cellspacing="0" style="display:inline-block;margin-bottom:6px;">
+                    <tr>
+                      <td style="background:#1877f2;border-radius:4px 0 0 4px;padding:4px 6px;font-size:11px;">f</td>
+                      <td style="background:rgba(24,119,242,0.15);border-radius:0 4px 4px 0;padding:4px 8px;">
+                        <a href="https://www.facebook.com/Infosoluces/"
+                           style="color:#1877f2;text-decoration:none;font-size:11px;font-weight:600;">
+                          Facebook
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                  <br>
+                  <!-- LinkedIn -->
+                  <table cellpadding="0" cellspacing="0" style="display:inline-block;">
+                    <tr>
+                      <td style="background:#0a66c2;border-radius:4px 0 0 4px;padding:4px 6px;font-size:11px;color:#fff;font-weight:bold;">in</td>
+                      <td style="background:rgba(10,102,194,0.15);border-radius:0 4px 4px 0;padding:4px 8px;">
+                        <a href="https://ci.linkedin.com/company/infosoluces"
+                           style="color:#0a66c2;text-decoration:none;font-size:11px;font-weight:600;">
+                          LinkedIn
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ FIN DE LA CARTE ─────────────────────────────────── -->
+      </table>
+
+      <!-- ▸ MENTION LÉGALE MINI ──────────────────────────────── -->
+      <table width="620" cellpadding="0" cellspacing="0" style="max-width:620px;width:100%;margin-top:12px;">
+        <tr>
+          <td style="
+            font-size:10px;color:#999;text-align:center;padding:8px 10px;
+            line-height:1.5;
+          ">
+            Cet email vous a &eacute;t&eacute; envoy&eacute; par
+            <strong style="color:#777;">INFOSOLUCES SARL</strong> dans le cadre
+            d'une prospection commerciale.
+          </td>
+        </tr>
+      </table>
+
+    </td>
+  </tr>
+</table>
+
+
+        </div>
+    </div>
+    
+
+    <div class="case-card" id="case4" style="border-left:4px solid #3498db;">
+        <div class="case-header">
+            <span class="case-icon">🏦</span>
+            <div>
+                <h2 style="color:#3498db;">Réseau bancaire multi-sites</h2>
+                <p class="case-meta">Réseau / Infra | 68 M FCFA &bull; Banque Atlantique CI</p>
+            </div>
+            <span class="case-num">#4</span>
+        </div>
+        <div class="email-preview">
+            <table width="620" cellpadding="0" cellspacing="0" style="
+        max-width:620px; width:100%;
+        background:#ffffff;
+        border-radius:16px;
+        overflow:hidden;
+        box-shadow:0 8px 40px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+      ">
+
+        <!-- ▸ BANDE DÉGRADÉE HAUT ----------------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(135deg,#0d0f14 0%,#1a1d2e 40%,#0066cc 100%);
+            padding:6px 0;
+          ">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="width:8px;background:#f0a500;"></td>
+                <td style="padding:0;"></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ EN-TÊTE ORANGE + LOGO --------------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(135deg,#f0a500 0%,#e89200 60%,#d48000 100%);
+            padding:0;
+          ">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:18px 28px;">
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <!-- Logo -->
+                      <td style="width:52px;">
+                        <img src="https://res.cloudinary.com/dsgd2h3dx/image/upload/v1772619527/logo_rfv6lb.jpg"
+                             alt="INFOSOLUCES"
+                             width="48" height="48"
+                             style="border-radius:10px;display:block;
+                                    box-shadow:0 2px 8px rgba(0,0,0,0.15);"
+                             onerror="this.style.display='none'">
+                      </td>
+                      <!-- Nom entreprise -->
+                      <td style="padding-left:14px;">
+                        <span style="
+                          color:#0d0f14;font-size:20px;font-weight:800;
+                          letter-spacing:-0.3px;text-shadow:0 1px 2px rgba(255,255,255,0.15);
+                        ">INFOSOLUCES</span>
+                        <span style="
+                          color:#3a2a0a;font-size:11px;display:block;
+                          opacity:0.8;font-weight:500;
+                        ">Solutions IT &bull; Abidjan, C&ocirc;te d'Ivoire</span>
+                      </td>
+                      <!-- Badge -->
+                      <td align="right" style="vertical-align:middle;">
+                        <span style="
+                          background:#0066cc;color:#ffffff;
+                          font-size:10px;padding:5px 14px;
+                          border-radius:20px;font-weight:700;
+                          letter-spacing:1px;text-transform:uppercase;
+                          box-shadow:0 2px 6px rgba(0,102,204,0.3);
+                        ">Proposition</span>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ BARRE ACCENT BLEU --------------------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(90deg,#0066cc 0%,#3399ff 50%,#0066cc 100%);
+            height:5px;
+          "></td>
+        </tr>
+
+        <!-- ▸ CORPS DE L'EMAIL ───────────────────────────────── -->
+        <tr>
+          <td style="padding:32px 34px 20px;background:#ffffff;">
+            <p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Bonjour M. Yao Laurent,</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Nous avons identifié votre appel d'offres pour la mise en place d'un réseau interconnecté sécurisé pour vos 5 agences (Abidjan, Bouaké, Yamoussoukro, San-Pédro, Korhogo). INFOSOLUCES SARL, PME ivoirienne spécialisée en solutions IT, vous propose une réponse complète incluant équipements Cisco, fibre optique, câblage structuré, téléphonie IP et supervision centralisée.</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Notre expérience dans le déploiement de réseaux privés VPN MPLS pour des institutions publiques et privées en Côte d'Ivoire nous permet de vous garantir une solution adaptée à votre budget, avec un accompagnement local et une maintenance réactive.</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Nous vous proposons une rencontre pour vous présenter notre offre technique et financière personnalisée, en phase avec vos exigences et votre deadline.</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Cordialement,</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">INFOSOLUCES SARL
+Rue des Bambous, Cocody Danga, Abidjan
+Tél : +225 27 22 52 40 88 | Mobile : +225 01 73 73 73 97
+Email : contact@infosoluces.ci
+Site : https://infosoluces.ci
+Facebook : https://www.facebook.com/Infosoluces/
+LinkedIn : https://ci.linkedin.com/company/infosoluces</p>
+          </td>
+        </tr>
+
+        <!-- ▸ SÉPARATEUR ÉLÉGANT --------------------------------- -->
+        <tr>
+          <td style="padding:0 34px 24px;background:#ffffff;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="border-bottom:1px solid #eee;"></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ BOUTONS CTA --------------------------------------- -->
+        <tr>
+          <td style="padding:0 34px 28px;background:#ffffff;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td align="center">
+                  <table cellpadding="0" cellspacing="0">
+                    <tr>
+                      <!-- Bouton principal : Contact -->
+                      <td style="
+                        background:linear-gradient(135deg,#0066cc,#0052a3);
+                        border-radius:8px;padding:0;
+                        box-shadow:0 4px 12px rgba(0,102,204,0.35);
+                      ">
+                        <a href="https://infosoluces.ci/contact"
+                           style="
+                            display:inline-block;padding:13px 36px;
+                            color:#ffffff;font-size:14px;font-weight:700;
+                            text-decoration:none;border-radius:8px;
+                            letter-spacing:0.3px;
+                        ">
+                          Nous contacter
+                        </a>
+                      </td>
+                      <td width="14"></td>
+                      <!-- Bouton secondaire : Site -->
+                      <td style="
+                        background:#0d0f14;border-radius:8px;padding:0;
+                        box-shadow:0 4px 12px rgba(13,15,20,0.25);
+                      ">
+                        <a href="https://infosoluces.ci"
+                           style="
+                            display:inline-block;padding:13px 28px;
+                            color:#f0a500;font-size:14px;font-weight:700;
+                            text-decoration:none;border-radius:8px;
+                            letter-spacing:0.3px;
+                        ">
+                          Site web
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ FOOTER COORDONNÉES + RÉSEAUX ---------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(135deg,#0d0f14 0%,#1a1d2e 100%);
+            padding:22px 30px;
+          ">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <!-- Coordonnées -->
+                <td style="font-size:12px;color:#888;line-height:1.6;">
+                  <strong style="color:#f0a500;font-size:13px;">INFOSOLUCES SARL</strong><br>
+                  Rue des Bambous, Cocody Danga, Abidjan<br>
+                  T&eacute;l&nbsp;: +225 27 22 52 40 88
+                  &nbsp;|&nbsp; Mobile : +225 01 73 73 73 97<br>
+                  <a href="mailto:contact@infosoluces.ci"
+                     style="color:#f0a500;text-decoration:none;">
+                    contact@infosoluces.ci
+                  </a>
+                </td>
+                <!-- Icônes réseaux sociaux avec badges colorés -->
+                <td align="right" style="vertical-align:top;">
+                  <!-- Site web -->
+                  <table cellpadding="0" cellspacing="0" style="display:inline-block;margin-bottom:6px;">
+                    <tr>
+                      <td style="background:#f0a500;border-radius:4px 0 0 4px;padding:4px 6px;font-size:11px;">🌐</td>
+                      <td style="background:rgba(240,165,0,0.15);border-radius:0 4px 4px 0;padding:4px 8px;">
+                        <a href="https://infosoluces.ci"
+                           style="color:#f0a500;text-decoration:none;font-size:11px;font-weight:600;">
+                          Site web
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                  <br>
+                  <!-- Facebook -->
+                  <table cellpadding="0" cellspacing="0" style="display:inline-block;margin-bottom:6px;">
+                    <tr>
+                      <td style="background:#1877f2;border-radius:4px 0 0 4px;padding:4px 6px;font-size:11px;">f</td>
+                      <td style="background:rgba(24,119,242,0.15);border-radius:0 4px 4px 0;padding:4px 8px;">
+                        <a href="https://www.facebook.com/Infosoluces/"
+                           style="color:#1877f2;text-decoration:none;font-size:11px;font-weight:600;">
+                          Facebook
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                  <br>
+                  <!-- LinkedIn -->
+                  <table cellpadding="0" cellspacing="0" style="display:inline-block;">
+                    <tr>
+                      <td style="background:#0a66c2;border-radius:4px 0 0 4px;padding:4px 6px;font-size:11px;color:#fff;font-weight:bold;">in</td>
+                      <td style="background:rgba(10,102,194,0.15);border-radius:0 4px 4px 0;padding:4px 8px;">
+                        <a href="https://ci.linkedin.com/company/infosoluces"
+                           style="color:#0a66c2;text-decoration:none;font-size:11px;font-weight:600;">
+                          LinkedIn
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ FIN DE LA CARTE ─────────────────────────────────── -->
+      </table>
+
+      <!-- ▸ MENTION LÉGALE MINI ──────────────────────────────── -->
+      <table width="620" cellpadding="0" cellspacing="0" style="max-width:620px;width:100%;margin-top:12px;">
+        <tr>
+          <td style="
+            font-size:10px;color:#999;text-align:center;padding:8px 10px;
+            line-height:1.5;
+          ">
+            Cet email vous a &eacute;t&eacute; envoy&eacute; par
+            <strong style="color:#777;">INFOSOLUCES SARL</strong> dans le cadre
+            d'une prospection commerciale.
+          </td>
+        </tr>
+      </table>
+
+    </td>
+  </tr>
+</table>
+
+
+        </div>
+    </div>
+    
+
+    <div class="case-card" id="case5" style="border-left:4px solid #9b59b6;">
+        <div class="case-header">
+            <span class="case-icon">🏗</span>
+            <div>
+                <h2 style="color:#9b59b6;">Infogérance ministérielle</h2>
+                <p class="case-meta">Infogérance | 36 M FCFA &bull; Ministère Écon. Numérique</p>
+            </div>
+            <span class="case-num">#5</span>
+        </div>
+        <div class="email-preview">
+            <table width="620" cellpadding="0" cellspacing="0" style="
+        max-width:620px; width:100%;
+        background:#ffffff;
+        border-radius:16px;
+        overflow:hidden;
+        box-shadow:0 8px 40px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+      ">
+
+        <!-- ▸ BANDE DÉGRADÉE HAUT ----------------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(135deg,#0d0f14 0%,#1a1d2e 40%,#0066cc 100%);
+            padding:6px 0;
+          ">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="width:8px;background:#f0a500;"></td>
+                <td style="padding:0;"></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ EN-TÊTE ORANGE + LOGO --------------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(135deg,#f0a500 0%,#e89200 60%,#d48000 100%);
+            padding:0;
+          ">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:18px 28px;">
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <!-- Logo -->
+                      <td style="width:52px;">
+                        <img src="https://res.cloudinary.com/dsgd2h3dx/image/upload/v1772619527/logo_rfv6lb.jpg"
+                             alt="INFOSOLUCES"
+                             width="48" height="48"
+                             style="border-radius:10px;display:block;
+                                    box-shadow:0 2px 8px rgba(0,0,0,0.15);"
+                             onerror="this.style.display='none'">
+                      </td>
+                      <!-- Nom entreprise -->
+                      <td style="padding-left:14px;">
+                        <span style="
+                          color:#0d0f14;font-size:20px;font-weight:800;
+                          letter-spacing:-0.3px;text-shadow:0 1px 2px rgba(255,255,255,0.15);
+                        ">INFOSOLUCES</span>
+                        <span style="
+                          color:#3a2a0a;font-size:11px;display:block;
+                          opacity:0.8;font-weight:500;
+                        ">Solutions IT &bull; Abidjan, C&ocirc;te d'Ivoire</span>
+                      </td>
+                      <!-- Badge -->
+                      <td align="right" style="vertical-align:middle;">
+                        <span style="
+                          background:#0066cc;color:#ffffff;
+                          font-size:10px;padding:5px 14px;
+                          border-radius:20px;font-weight:700;
+                          letter-spacing:1px;text-transform:uppercase;
+                          box-shadow:0 2px 6px rgba(0,102,204,0.3);
+                        ">Proposition</span>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ BARRE ACCENT BLEU --------------------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(90deg,#0066cc 0%,#3399ff 50%,#0066cc 100%);
+            height:5px;
+          "></td>
+        </tr>
+
+        <!-- ▸ CORPS DE L'EMAIL ───────────────────────────────── -->
+        <tr>
+          <td style="padding:32px 34px 20px;background:#ffffff;">
+            <p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Bonjour M. N'Dri Germain,</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Nous avons identifié votre appel d'offres pour l'infogérance du parc informatique du Ministère de l'Économie Numérique. INFOSOLUCES SARL, PME ivoirienne spécialisée en solutions IT, souhaite vous soumettre une proposition adaptée à vos besoins : maintenance de 350 postes, 15 serveurs, helpdesk de 8h à 18h, gestion des licences et sécurité du SI, avec des SLA stricts.</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Forts de notre expérience dans la maintenance IT de plusieurs PME et institutions publiques (portail ANRMP, infrastructure pour hôpitaux), nous pouvons vous garantir une continuité de service et une réactivité optimale. Nous proposons une solution progressive pour coller à votre budget, avec un accompagnement personnalisé.</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Pouvons-nous convenir d'un rendez-vous cette semaine pour vous présenter notre offre détaillée et un devis gratuit ? La date limite du 15 octobre approche, et nous sommes prêts à vous accompagner rapidement.</p><p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">Cordialement,
+L'équipe INFOSOLUCES
+INFOSOLUCES SARL
+Rue des Bambous, Cocody Danga, Abidjan
+Tél : +225 27 22 52 40 88 | Mobile : +225 01 73 73 73 97
+Email : contact@infosoluces.ci
+Site : https://infosoluces.ci
+Facebook : https://www.facebook.com/Infosoluces/
+LinkedIn : https://ci.linkedin.com/company/infosoluces</p>
+          </td>
+        </tr>
+
+        <!-- ▸ SÉPARATEUR ÉLÉGANT --------------------------------- -->
+        <tr>
+          <td style="padding:0 34px 24px;background:#ffffff;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="border-bottom:1px solid #eee;"></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ BOUTONS CTA --------------------------------------- -->
+        <tr>
+          <td style="padding:0 34px 28px;background:#ffffff;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td align="center">
+                  <table cellpadding="0" cellspacing="0">
+                    <tr>
+                      <!-- Bouton principal : Contact -->
+                      <td style="
+                        background:linear-gradient(135deg,#0066cc,#0052a3);
+                        border-radius:8px;padding:0;
+                        box-shadow:0 4px 12px rgba(0,102,204,0.35);
+                      ">
+                        <a href="https://infosoluces.ci/contact"
+                           style="
+                            display:inline-block;padding:13px 36px;
+                            color:#ffffff;font-size:14px;font-weight:700;
+                            text-decoration:none;border-radius:8px;
+                            letter-spacing:0.3px;
+                        ">
+                          Nous contacter
+                        </a>
+                      </td>
+                      <td width="14"></td>
+                      <!-- Bouton secondaire : Site -->
+                      <td style="
+                        background:#0d0f14;border-radius:8px;padding:0;
+                        box-shadow:0 4px 12px rgba(13,15,20,0.25);
+                      ">
+                        <a href="https://infosoluces.ci"
+                           style="
+                            display:inline-block;padding:13px 28px;
+                            color:#f0a500;font-size:14px;font-weight:700;
+                            text-decoration:none;border-radius:8px;
+                            letter-spacing:0.3px;
+                        ">
+                          Site web
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ FOOTER COORDONNÉES + RÉSEAUX ---------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(135deg,#0d0f14 0%,#1a1d2e 100%);
+            padding:22px 30px;
+          ">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <!-- Coordonnées -->
+                <td style="font-size:12px;color:#888;line-height:1.6;">
+                  <strong style="color:#f0a500;font-size:13px;">INFOSOLUCES SARL</strong><br>
+                  Rue des Bambous, Cocody Danga, Abidjan<br>
+                  T&eacute;l&nbsp;: +225 27 22 52 40 88
+                  &nbsp;|&nbsp; Mobile : +225 01 73 73 73 97<br>
+                  <a href="mailto:contact@infosoluces.ci"
+                     style="color:#f0a500;text-decoration:none;">
+                    contact@infosoluces.ci
+                  </a>
+                </td>
+                <!-- Icônes réseaux sociaux avec badges colorés -->
+                <td align="right" style="vertical-align:top;">
+                  <!-- Site web -->
+                  <table cellpadding="0" cellspacing="0" style="display:inline-block;margin-bottom:6px;">
+                    <tr>
+                      <td style="background:#f0a500;border-radius:4px 0 0 4px;padding:4px 6px;font-size:11px;">🌐</td>
+                      <td style="background:rgba(240,165,0,0.15);border-radius:0 4px 4px 0;padding:4px 8px;">
+                        <a href="https://infosoluces.ci"
+                           style="color:#f0a500;text-decoration:none;font-size:11px;font-weight:600;">
+                          Site web
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                  <br>
+                  <!-- Facebook -->
+                  <table cellpadding="0" cellspacing="0" style="display:inline-block;margin-bottom:6px;">
+                    <tr>
+                      <td style="background:#1877f2;border-radius:4px 0 0 4px;padding:4px 6px;font-size:11px;">f</td>
+                      <td style="background:rgba(24,119,242,0.15);border-radius:0 4px 4px 0;padding:4px 8px;">
+                        <a href="https://www.facebook.com/Infosoluces/"
+                           style="color:#1877f2;text-decoration:none;font-size:11px;font-weight:600;">
+                          Facebook
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                  <br>
+                  <!-- LinkedIn -->
+                  <table cellpadding="0" cellspacing="0" style="display:inline-block;">
+                    <tr>
+                      <td style="background:#0a66c2;border-radius:4px 0 0 4px;padding:4px 6px;font-size:11px;color:#fff;font-weight:bold;">in</td>
+                      <td style="background:rgba(10,102,194,0.15);border-radius:0 4px 4px 0;padding:4px 8px;">
+                        <a href="https://ci.linkedin.com/company/infosoluces"
+                           style="color:#0a66c2;text-decoration:none;font-size:11px;font-weight:600;">
+                          LinkedIn
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ FIN DE LA CARTE ─────────────────────────────────── -->
+      </table>
+
+      <!-- ▸ MENTION LÉGALE MINI ──────────────────────────────── -->
+      <table width="620" cellpadding="0" cellspacing="0" style="max-width:620px;width:100%;margin-top:12px;">
+        <tr>
+          <td style="
+            font-size:10px;color:#999;text-align:center;padding:8px 10px;
+            line-height:1.5;
+          ">
+            Cet email vous a &eacute;t&eacute; envoy&eacute; par
+            <strong style="color:#777;">INFOSOLUCES SARL</strong> dans le cadre
+            d'une prospection commerciale.
+          </td>
+        </tr>
+      </table>
+
+    </td>
+  </tr>
+</table>
+
+
+        </div>
+    </div>
+    
+</div>
+
+<div class="footer">
+  <span class="bar"></span>
+  Généré par <strong>Spyke</strong> &middot; AO Tracker INFOSOLUCES<br>
+  <span style="font-size:10px;">4 mai 2026</span>
+  <span class="bar"></span>
+</div>
+
+</body>
+</html>

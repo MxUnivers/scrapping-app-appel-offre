@@ -2,7 +2,7 @@ from flask import Flask, render_template, jsonify, request
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask_cors import CORS
 from scrapers.web_search import search_tenders
-from models.database import init_db, get_all_tenders, get_stats , update_status
+from models.database import init_db, get_db, get_all_tenders, get_stats , update_status
 from models.users         import init_users, get_all_users
 from utils.notifier       import notify_new_tenders, notify_urgent_tenders
 from models.prospect_data import (
@@ -12,9 +12,12 @@ from models.prospect_data import (
     PROSPECT_STATUS, get_campaigns, create_campaign,
 )
 from utils.llm_prospect   import generate_prospect_email, score_prospect_quality
+from utils.doc_analyzer   import analyze_document, extract_text_from_file, send_document_report, DEFAULT_DOC_PROMPT
+from models.users         import CATEGORIES
 import atexit
 import os
 import random
+import datetime as dt
 
 app = Flask(__name__)
 CORS(app)
@@ -169,6 +172,140 @@ def api_test_email():
         "tender":  fake_tender.get("title"),
         "envoyes": len([v for v in sent_to.values() if v["sent"]]),
         "details": sent_to,
+    })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  GESTION DES UTILISATEURS / ÉQUIPES — Routes API
+# ══════════════════════════════════════════════════════════════════════════════
+
+from datetime import datetime
+from bson import ObjectId
+from pymongo.errors import DuplicateKeyError
+
+
+@app.route("/api/users", methods=["GET"])
+def api_list_users():
+    """Liste tous les utilisateurs."""
+    try:
+        db = get_db()
+        users = []
+        for doc in db["users"].find().sort("full_name", 1):
+            doc["id"] = str(doc.pop("_id"))
+            users.append(doc)
+        return jsonify({"items": users, "total": len(users)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/users/<user_id>", methods=["GET"])
+def api_get_user(user_id):
+    try:
+        db = get_db()
+        doc = db["users"].find_one({"_id": ObjectId(user_id)})
+        if not doc:
+            return jsonify({"error": "Utilisateur introuvable"}), 404
+        doc["id"] = str(doc.pop("_id"))
+        return jsonify(doc)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/users", methods=["POST"])
+def api_create_user():
+    try:
+        data = request.get_json() or {}
+        if not data.get("full_name") or not data.get("email"):
+            return jsonify({"error": "Nom et email requis"}), 400
+
+        doc = {
+            "username":     data.get("username", data["email"].split("@")[0]),
+            "full_name":    data["full_name"].strip(),
+            "email":        data["email"].strip().lower(),
+            "role":         data.get("role", "member"),
+            "categories":   data.get("categories", ["CAT1"]),
+            "sectors":      data.get("sectors", []),
+            "score_min":    data.get("score_min", 40),
+            "notify_email": data.get("notify_email", True),
+            "active":       data.get("active", True),
+            "phone":        data.get("phone", ""),
+            "title":        data.get("title", ""),
+            "created_at":   datetime.utcnow(),
+            "updated_at":   datetime.utcnow(),
+        }
+        db = get_db()
+        col = db["users"]
+        col.create_index("username", unique=True)
+        col.create_index("email", unique=True)
+        result = col.insert_one(doc)
+        doc["id"] = str(result.inserted_id)
+        return jsonify({"status": "ok", "user": doc}), 201
+    except DuplicateKeyError:
+        return jsonify({"error": "Email ou nom d'utilisateur déjà pris"}), 409
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/users/<user_id>", methods=["PATCH"])
+def api_update_user(user_id):
+    try:
+        data = request.get_json() or {}
+        db = get_db()
+        allowed = ("full_name", "email", "role", "categories", "sectors",
+                   "score_min", "notify_email", "active", "phone", "title")
+        update = {k: v for k, v in data.items() if k in allowed}
+        if not update:
+            return jsonify({"error": "Aucune donnée valide"}), 400
+        update["updated_at"] = datetime.utcnow()
+        result = db["users"].update_one(
+            {"_id": ObjectId(user_id)}, {"$set": update}
+        )
+        if result.matched_count == 0:
+            return jsonify({"error": "Introuvable"}), 404
+        doc = db["users"].find_one({"_id": ObjectId(user_id)})
+        doc["id"] = str(doc.pop("_id"))
+        return jsonify({"status": "ok", "user": doc})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/users/<user_id>", methods=["DELETE"])
+def api_delete_user(user_id):
+    try:
+        db = get_db()
+        result = db["users"].update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"active": False, "updated_at": datetime.utcnow()}}
+        )
+        if result.matched_count == 0:
+            return jsonify({"error": "Introuvable"}), 404
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/users/categories", methods=["GET"])
+def api_list_categories():
+    """Retourne les catégories disponibles."""
+    cats = []
+    for cid, cat in CATEGORIES.items():
+        cats.append({
+            "id": cid,
+            "label": cat["label"],
+            "emails": cat.get("emails", []),
+        })
+    return jsonify({"items": cats})
+
+
+@app.route("/api/users/roles", methods=["GET"])
+def api_list_roles():
+    """Retourne les rôles disponibles."""
+    return jsonify({
+        "items": [
+            {"id": "admin", "label": "Administrateur"},
+            {"id": "member", "label": "Membre équipe"},
+            {"id": "viewer", "label": "Lecteur"},
+        ]
     })
 
 
@@ -406,6 +543,170 @@ def api_create_campaign():
     sectors = data.get("sectors", [])
     cid = create_campaign(name, desc, sectors)
     return jsonify({"status": "ok", "campaign_id": cid})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  ANALYSE DE DOCUMENTS — Routes API
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.route("/api/documents/analyze", methods=["POST"])
+def api_analyze_document():
+    """Analyse un document texte via DeepSeek."""
+    try:
+        data = request.get_json() or {}
+        text  = data.get("text", "")
+        title = data.get("title", "Document sans titre")
+        prompt = data.get("custom_prompt")
+
+        if not text or len(text) < 50:
+            return jsonify({"error": "Texte trop court (min 50 car.)"}), 400
+
+        report = analyze_document(text, title, custom_prompt=prompt)
+
+        # Envoyer le rapport aux équipes
+        sent = send_document_report(report)
+
+        return jsonify({
+            "status": "ok",
+            "report": report,
+            "notified": len([s for s in sent if s["sent"]]),
+        })
+    except Exception as e:
+        print(f"[ERREUR] /api/documents/analyze : {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/documents/upload", methods=["POST"])
+def api_upload_document():
+    """Upload + analyse d'un fichier (PDF, DOCX, TXT, image)."""
+    try:
+        if "file" not in request.files:
+            return jsonify({"error": "Aucun fichier fourni"}), 400
+
+        file = request.files["file"]
+        filename = file.filename or "document"
+        custom_prompt = request.form.get("custom_prompt")
+
+        # Sauvegarder temporairement
+        import tempfile
+        temp_dir = tempfile.gettempdir()
+        safe_name = filename.replace(" ", "_").replace("/", "_")
+        temp_path = os.path.join(temp_dir, f"doc_analysis_{safe_name}")
+        file.save(temp_path)
+
+        # Extraire le texte
+        text = extract_text_from_file(temp_path)
+        try:
+            os.remove(temp_path)
+        except:
+            pass
+
+        if not text or len(text) < 20:
+            return jsonify({"error": "Impossible d'extraire le texte du document"}), 400
+
+        # Analyser
+        report = analyze_document(text, filename, custom_prompt=custom_prompt)
+        sent = send_document_report(report)
+
+        return jsonify({
+            "status": "ok",
+            "filename": filename,
+            "text_length": len(text),
+            "report": report,
+            "notified": len([s for s in sent if s["sent"]]),
+        })
+    except Exception as e:
+        print(f"[ERREUR] /api/documents/upload : {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/documents/default-prompt", methods=["GET"])
+def api_default_prompt():
+    """Retourne le prompt par défaut pour l'analyse de documents."""
+    return jsonify({"prompt": DEFAULT_DOC_PROMPT})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  CONFIGURATION LLM — Routes API
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Stockage simple des configs en mémoire (NB: pourra être dans MongoDB)
+_llm_config = {
+    "prompt_analyse_doc": DEFAULT_DOC_PROMPT,
+    "prompt_prospection": None,  # Utilise celui de llm_prospect.py
+    "schedule_enabled":   True,
+    "schedule_hours":     [8, 9, 10, 14, 15, 17],  # Heures d'exécution
+    "schedule_interval":  "daily",  # daily, hourly, custom
+    "model":              "deepseek-chat",
+    "temperature":        0.7,
+    "max_results":        10,
+}
+
+
+@app.route("/api/config/llm", methods=["GET"])
+def api_get_llm_config():
+    """Retourne la configuration LLM actuelle."""
+    return jsonify(_llm_config)
+
+
+@app.route("/api/config/llm", methods=["PATCH"])
+def api_update_llm_config():
+    """Met à jour la configuration LLM."""
+    try:
+        data = request.get_json() or {}
+        for key in ("prompt_analyse_doc", "schedule_enabled", "schedule_hours",
+                     "schedule_interval", "model", "temperature", "max_results"):
+            if key in data:
+                _llm_config[key] = data[key]
+        return jsonify({"status": "ok", "config": _llm_config})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  SCHEDULER — Auto-expiration des AO
+# ══════════════════════════════════════════════════════════════════════════════
+
+def scheduled_expire_tenders():
+    """
+    Passe automatiquement en "Expiré" les AO dont la deadline est dépassée.
+    Exécution quotidienne.
+    """
+    today = dt.datetime.utcnow().strftime("%Y-%m-%d")
+    print(f"\n[EXPIRE] ⏰ Vérification des deadlines dépassées (date: {today})")
+
+    from bson import ObjectId
+    from models.database import get_db
+
+    db = get_db()
+    col = db["tenders"]
+
+    # AO avec deadline passée ET encore en statut actif
+    expired = col.update_many(
+        {
+            "deadline": {"$lt": today},
+            "status": {"$in": ["Nouveau", "Lu"]},
+        },
+        {"$set": {"status": "Expiré", "updated_at": dt.datetime.utcnow()}}
+    )
+
+    if expired.modified_count > 0:
+        print(f"[EXPIRE] ✅ {expired.modified_count} AO marqués comme Expirés")
+    else:
+        print(f"[EXPIRE] ℹ️  Aucun AO à expirer")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  SCHEDULER — Analyse documentaire mensuelle
+# ══════════════════════════════════════════════════════════════════════════════
+
+def scheduled_document_check():
+    """
+    Vérifie les nouveaux documents dans un dossier surveillé.
+    NB: Pour l'instant, placeholder — l'analyse se fait via l'API upload.
+    """
+    print(f"\n[DOC-CHECK] ⏰ Vérification documentaire...")
+    print(f"[DOC-CHECK] ℹ️  L'analyse se fait via l'API /api/documents/analyze")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -917,14 +1218,14 @@ def scheduled_search():
 # ══════════════════════════════════════════════════════════════════════════════
 
 # TEST : génération de prospection toutes les 30 minutes (envoi TEST vers aymarbly)
-scheduler.add_job(
-    func=scheduled_prospect_generate, trigger="interval",
-    minutes=30, id="prospect_generate", max_instances=1,
-)
-scheduler.add_job(
-    func=scheduled_prospect_send_test, trigger="interval",
-    minutes=35, id="prospect_send_test", max_instances=1,
-)
+# scheduler.add_job(
+#     func=scheduled_prospect_generate, trigger="interval",
+#     minutes=30, id="prospect_generate", max_instances=1,
+# )
+# scheduler.add_job(
+#     func=scheduled_prospect_send_test, trigger="interval",
+#     minutes=35, id="prospect_send_test", max_instances=1,
+# )
 
 # PROD : génération tous les jours à 08h, envoi à 09h
 # scheduler.add_job(
@@ -945,10 +1246,10 @@ scheduler.add_job(
 # )
 
 # RELANCE : tous les jours à 10h (prospects sans réponse depuis 7+ jours)
-scheduler.add_job(
-    func=lambda: _run_follow_up(), trigger="interval",
-    hours=24, id="prospect_follow_up", max_instances=1,
-)
+# scheduler.add_job(
+#     func=lambda: _run_follow_up(), trigger="interval",
+#     hours=24, id="prospect_follow_up", max_instances=1,
+# )
 
 def _run_follow_up():
     """Wrapper pour les relances automatiques."""
@@ -993,6 +1294,23 @@ def _run_follow_up():
     print(f"  [FOLLOW-UP] ✅ {sent} relances envoyées")
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  SCHEDULER JOBS — Auto-expiration & Documents
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Auto-expiration des AO (quotidien à 02h00)
+scheduler.add_job(
+    func=scheduled_expire_tenders, trigger="cron",
+    hour=2, minute=0, id="expire_tenders", max_instances=1,
+)
+
+# Vérification documentaire (quotidien à 06h00)
+scheduler.add_job(
+    func=scheduled_document_check, trigger="cron",
+    hour=6, minute=0, id="doc_check", max_instances=1,
+)
+
+
 # scheduler.start()
 atexit.register(lambda: scheduler.shutdown())
 
@@ -1013,9 +1331,13 @@ if __name__ == "__main__":
     print(f"  Relancer      → POST /api/prospects/follow-up")
     print(f"  Stats         → /api/prospects/stats")
     print(f"  Campagnes     → /api/prospects/campaigns")
+    print(f"  Docs Analyse  → POST /api/documents/analyze")
+    print(f"  Docs Upload   → POST /api/documents/upload")
+    print(f"  Config LLM    → GET  /api/config/llm")
     print(f"  Requêtes      → {len(ALL_QUERIES)} au total")
     print(f"  Filtre CI     → {len(KEYWORDS_CI)} mots-clés")
     print(f"  Catégories    → {list(SEARCH_QUERIES.keys())}")
     print(f"  Prospection   → Test toutes les 30 min")
+    print(f"  Auto-expire   → Quotidien 02h00")
     print(f"{'='*60}\n")
     app.run(debug=True, port=5000, use_reloader=True)

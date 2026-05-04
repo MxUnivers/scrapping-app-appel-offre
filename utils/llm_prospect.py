@@ -31,6 +31,9 @@ Domaines d'expertise :
 • Cybersécurité (audit, firewall, SOC, PKI, ISO 27001)
 • Infogérance & Maintenance (TMA, helpdesk, supervision)
 • Vente matériel IT (serveurs, équipements réseau, ordinateurs)
+• Téléphonie sur IP (VoIP, solutions de communication unifiée)
+• Business Intelligence & Intelligence Artificielle (BI, IA, datascience)
+• Audit de systèmes d'information (diagnostic, optimisation, conformité)
 
 Réalisations clés :
 • Portail marchés publics pour l'ANRMP
@@ -38,9 +41,13 @@ Réalisations clés :
 • Infrastructure réseau pour 3 hôpitaux publics
 • Maintenance IT de 5 PME ivoiriennes (contrats pluriannuels)
 
-🔗 Site web  : https://infosoluces.ci
-📧 Contact   : aymarbly559@gmail.com
-📞 Téléphone : +225 XX XX XX XX
+🌐 Site web  : https://infosoluces.ci
+📧 Email     : contact@infosoluces.ci
+📞 Téléphone : +225 27 22 52 40 88
+📱 Mobile    : +225 01 73 73 73 97
+📍 Adresse   : Rue des Bambous, Cocody Danga, Abidjan
+🔵 Facebook  : https://www.facebook.com/Infosoluces/
+💼 LinkedIn  : https://ci.linkedin.com/company/infosoluces
 """.strip()
 
 # ── Prompts LLM ──────────────────────────────────────────────────────────────
@@ -55,14 +62,17 @@ Règles importantes :
 - Sois précis : cite le besoin spécifique de l'entreprise cible
 - Ne mens pas — ne prétends pas avoir réalisé ce qui n'a pas été fait
 - Propose toujours une action concrète (rendez-vous, démo, devis gratuit)
-- Termine par une signature professionnelle INFOSOLUCES
+- Termine par une signature professionnelle INFOSOLUCES contenant les liens Facebook et LinkedIn
 - Sois concis : max 3-4 paragraphes
+- ADAPTE ta proposition au budget du client (sans mentionner le montant EXACT dans le texte)
+  - Si budget faible → propose solution progressive/par phase
+  - Si budget élevé → propose solution complète clé en main
+- IMPORTANT : Ne mentionne JAMAIS le montant exact du budget dans le corps de l'email. Reste vague ("solution adaptée à votre budget", "devis personnalisé") sans donner de chiffres.
 
 Tu réponds UNIQUEMENT avec un objet JSON valide :
 {{
   "subject": "Objet de l'email (max 80 car.)",
-  "body_html": "Corps de l'email en HTML formaté, prêt à envoyer",
-  "body_text": "Version texte brut du corps (alternative si le HTML est refusé)",
+  "body_text": "Corps de l'email en TEXTE BRUT uniquement. Signature avec les coordonnées INFOSOLUCES.",
   "call_to_action": "L'action concrète proposée (ex: proposition technique, démo, rendez-vous)",
   "confidence": 0-100,
   "reasoning": "Pourquoi cet angle d'approche a été choisi"
@@ -86,7 +96,7 @@ Contact identifié :
   Téléphone   : {telephone}
   Adresse     : {adresse}
 
-Informations supplémentaires :
+Informations supplémentaires (À USAGE INTERNE — ne pas divulguer le budget exact) :
   Budget     : {budget}
   Deadline   : {deadline}
   Localisation : {localisation}
@@ -159,6 +169,277 @@ def _parse_json(raw: str) -> dict:
     return parsed
 
 
+# ── Template HTML orange & bleu ───────────────────────────────────────────────
+
+INFO_LOGO_URL = "https://res.cloudinary.com/dsgd2h3dx/image/upload/v1772619527/logo_rfv6lb.jpg"
+
+def _build_prospect_html(body_text: str, subject: str) -> str:
+    """
+    Enveloppe le texte brut dans un template HTML moderne
+    avec les couleurs INFOSOLUCES (orange #f0a500, bleu #0066cc)
+    et un style IA/professionnel.
+    """
+    # Convertir les sauts de ligne en paragraphes HTML stylés
+    paragraphs = body_text.strip().split("\n\n")
+    body_html = "".join(
+        f"""<p style="margin:0 0 16px 0;line-height:1.8;font-size:15px;
+color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;">{p.strip()}</p>"""
+        for p in paragraphs if p.strip()
+    )
+
+    return f'''<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{subject}</title>
+</head>
+<body style="
+  margin:0; padding:0;
+  background:linear-gradient(135deg,#e8edf5 0%,#f5f0e8 100%);
+  font-family:'Segoe UI',Arial,Helvetica,sans-serif;
+">
+
+<table width="100%" cellpadding="0" cellspacing="0" style="background:transparent;">
+  <tr>
+    <td align="center" style="padding:30px 12px;">
+
+      <!-- ▸ CARTE PRINCIPALE ──────────────────────────────────── -->
+      <table width="620" cellpadding="0" cellspacing="0" style="
+        max-width:620px; width:100%;
+        background:#ffffff;
+        border-radius:16px;
+        overflow:hidden;
+        box-shadow:0 8px 40px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+      ">
+
+        <!-- ▸ BANDE DÉGRADÉE HAUT ----------------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(135deg,#0d0f14 0%,#1a1d2e 40%,#0066cc 100%);
+            padding:6px 0;
+          ">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="width:8px;background:#f0a500;"></td>
+                <td style="padding:0;"></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ EN-TÊTE ORANGE + LOGO --------------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(135deg,#f0a500 0%,#e89200 60%,#d48000 100%);
+            padding:0;
+          ">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:18px 28px;">
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <!-- Logo -->
+                      <td style="width:52px;">
+                        <img src="{INFO_LOGO_URL}"
+                             alt="INFOSOLUCES"
+                             width="48" height="48"
+                             style="border-radius:10px;display:block;
+                                    box-shadow:0 2px 8px rgba(0,0,0,0.15);"
+                             onerror="this.style.display='none'">
+                      </td>
+                      <!-- Nom entreprise -->
+                      <td style="padding-left:14px;">
+                        <span style="
+                          color:#0d0f14;font-size:20px;font-weight:800;
+                          letter-spacing:-0.3px;text-shadow:0 1px 2px rgba(255,255,255,0.15);
+                        ">INFOSOLUCES</span>
+                        <span style="
+                          color:#3a2a0a;font-size:11px;display:block;
+                          opacity:0.8;font-weight:500;
+                        ">Solutions IT &bull; Abidjan, C&ocirc;te d'Ivoire</span>
+                      </td>
+                      <!-- Badge -->
+                      <td align="right" style="vertical-align:middle;">
+                        <span style="
+                          background:#0066cc;color:#ffffff;
+                          font-size:10px;padding:5px 14px;
+                          border-radius:20px;font-weight:700;
+                          letter-spacing:1px;text-transform:uppercase;
+                          box-shadow:0 2px 6px rgba(0,102,204,0.3);
+                        ">Proposition</span>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ BARRE ACCENT BLEU --------------------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(90deg,#0066cc 0%,#3399ff 50%,#0066cc 100%);
+            height:5px;
+          "></td>
+        </tr>
+
+        <!-- ▸ CORPS DE L'EMAIL ───────────────────────────────── -->
+        <tr>
+          <td style="padding:32px 34px 20px;background:#ffffff;">
+            {body_html}
+          </td>
+        </tr>
+
+        <!-- ▸ SÉPARATEUR ÉLÉGANT --------------------------------- -->
+        <tr>
+          <td style="padding:0 34px 24px;background:#ffffff;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="border-bottom:1px solid #eee;"></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ BOUTONS CTA --------------------------------------- -->
+        <tr>
+          <td style="padding:0 34px 28px;background:#ffffff;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td align="center">
+                  <table cellpadding="0" cellspacing="0">
+                    <tr>
+                      <!-- Bouton principal : Contact -->
+                      <td style="
+                        background:linear-gradient(135deg,#0066cc,#0052a3);
+                        border-radius:8px;padding:0;
+                        box-shadow:0 4px 12px rgba(0,102,204,0.35);
+                      ">
+                        <a href="https://infosoluces.ci/contact"
+                           style="
+                            display:inline-block;padding:13px 36px;
+                            color:#ffffff;font-size:14px;font-weight:700;
+                            text-decoration:none;border-radius:8px;
+                            letter-spacing:0.3px;
+                        ">
+                          Nous contacter
+                        </a>
+                      </td>
+                      <td width="14"></td>
+                      <!-- Bouton secondaire : Site -->
+                      <td style="
+                        background:#0d0f14;border-radius:8px;padding:0;
+                        box-shadow:0 4px 12px rgba(13,15,20,0.25);
+                      ">
+                        <a href="https://infosoluces.ci"
+                           style="
+                            display:inline-block;padding:13px 28px;
+                            color:#f0a500;font-size:14px;font-weight:700;
+                            text-decoration:none;border-radius:8px;
+                            letter-spacing:0.3px;
+                        ">
+                          Site web
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ FOOTER COORDONNÉES + RÉSEAUX ---------------------- -->
+        <tr>
+          <td style="
+            background:linear-gradient(135deg,#0d0f14 0%,#1a1d2e 100%);
+            padding:22px 30px;
+          ">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <!-- Coordonnées -->
+                <td style="font-size:12px;color:#888;line-height:1.6;">
+                  <strong style="color:#f0a500;font-size:13px;">INFOSOLUCES SARL</strong><br>
+                  Rue des Bambous, Cocody Danga, Abidjan<br>
+                  T&eacute;l&nbsp;: +225 27 22 52 40 88
+                  &nbsp;|&nbsp; Mobile : +225 01 73 73 73 97<br>
+                  <a href="mailto:contact@infosoluces.ci"
+                     style="color:#f0a500;text-decoration:none;">
+                    contact@infosoluces.ci
+                  </a>
+                </td>
+                <!-- Icônes réseaux sociaux avec badges colorés -->
+                <td align="right" style="vertical-align:top;">
+                  <!-- Site web -->
+                  <table cellpadding="0" cellspacing="0" style="display:inline-block;margin-bottom:6px;">
+                    <tr>
+                      <td style="background:#f0a500;border-radius:4px 0 0 4px;padding:4px 6px;font-size:11px;">🌐</td>
+                      <td style="background:rgba(240,165,0,0.15);border-radius:0 4px 4px 0;padding:4px 8px;">
+                        <a href="https://infosoluces.ci"
+                           style="color:#f0a500;text-decoration:none;font-size:11px;font-weight:600;">
+                          Site web
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                  <br>
+                  <!-- Facebook -->
+                  <table cellpadding="0" cellspacing="0" style="display:inline-block;margin-bottom:6px;">
+                    <tr>
+                      <td style="background:#1877f2;border-radius:4px 0 0 4px;padding:4px 6px;font-size:11px;">f</td>
+                      <td style="background:rgba(24,119,242,0.15);border-radius:0 4px 4px 0;padding:4px 8px;">
+                        <a href="https://www.facebook.com/Infosoluces/"
+                           style="color:#1877f2;text-decoration:none;font-size:11px;font-weight:600;">
+                          Facebook
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                  <br>
+                  <!-- LinkedIn -->
+                  <table cellpadding="0" cellspacing="0" style="display:inline-block;">
+                    <tr>
+                      <td style="background:#0a66c2;border-radius:4px 0 0 4px;padding:4px 6px;font-size:11px;color:#fff;font-weight:bold;">in</td>
+                      <td style="background:rgba(10,102,194,0.15);border-radius:0 4px 4px 0;padding:4px 8px;">
+                        <a href="https://ci.linkedin.com/company/infosoluces"
+                           style="color:#0a66c2;text-decoration:none;font-size:11px;font-weight:600;">
+                          LinkedIn
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ▸ FIN DE LA CARTE ─────────────────────────────────── -->
+      </table>
+
+      <!-- ▸ MENTION LÉGALE MINI ──────────────────────────────── -->
+      <table width="620" cellpadding="0" cellspacing="0" style="max-width:620px;width:100%;margin-top:12px;">
+        <tr>
+          <td style="
+            font-size:10px;color:#999;text-align:center;padding:8px 10px;
+            line-height:1.5;
+          ">
+            Cet email vous a &eacute;t&eacute; envoy&eacute; par
+            <strong style="color:#777;">INFOSOLUCES SARL</strong> dans le cadre
+            d'une prospection commerciale.
+          </td>
+        </tr>
+      </table>
+
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>'''
+
+
 # ── Principale : génération d'un email de prospection ─────────────────────────
 
 def generate_prospect_email(tender: dict) -> dict:
@@ -191,7 +472,14 @@ def generate_prospect_email(tender: dict) -> dict:
     )
 
     raw = _call_deepseek(SYSTEM_PROMPT, user_prompt, max_tokens=1200)
-    return _parse_json(raw)
+    result = _parse_json(raw)
+
+    # Envelopper le body_text dans le template HTML orange & bleu
+    body_text = result.get("body_text", "")
+    subject   = result.get("subject", "")
+    result["body_html"] = _build_prospect_html(body_text, subject)
+
+    return result
 
 
 def generate_follow_up_email(prospect: dict, previous_email: dict) -> dict:
